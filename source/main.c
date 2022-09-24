@@ -4,9 +4,16 @@
 #include "font.h"
 #include "text.h"
 
+#include "tonc_utils.h"
+#include "tonc_irq.h"
+
+
 /*********************************************************************************
 	Global Variables
 *********************************************************************************/
+
+__attribute__((section(".iwram"), long_call)) void isr_master();
+__attribute__((section(".iwram"), long_call)) void hbl_grad_direct();
 
 /* Map */
 struct map *_current_map;
@@ -227,10 +234,22 @@ void update_map() {
 	set_tile( 16, 11, 0x7, 16 );
 }
 
+uint32_t _count;
+
+void hbl_grad_routed()
+{
+	_count++;
+}
+
+const fnptr master_isrs[2]= 
+{
+	(fnptr)isr_master,
+	(fnptr)hbl_grad_direct 
+};
+
 int main()
 {
-
-	uint8_t i;
+	_count = 0;
 
 	/* Load colour palette */
 	memcpy( pal_bg_mem, _colour_palette, sizeof( _colour_palette ) );
@@ -253,24 +272,32 @@ int main()
 	/* Set bitmap mode to 0 and show backgrounds 0 and 1 */
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1;
 
-
 	/* Load the map and set our initial location */
 	_current_map = &map_list[0];
 	map_pos = (struct dir_vec){ 0, 0 };
 
 	update_map();
 
+	//REG_TM0D = 1;
+	REG_TM0CNT = TM_FREQ_1 | TM_IRQ | TM_ENABLE;
+
+	/* Enabled timer interrupts */
+	irq_init(master_isrs[0]);
+	irq_add(II_TIMER0, hbl_grad_routed);
 
 	while(1) {
-
 
 		/* Debug */
 		sprintf( write_text, "012345678901234567890123456789" );
 		write_string( write_text, 0, 0, 0 );
-		sprintf( write_text, "P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
+		sprintf( write_text, "C(%d)", (int)_count );
 		write_string( write_text, 0, 1, 0 );
-		sprintf( write_text, "B(%d,%d,%d,%d)  ", (int)key_held(KEY_UP), (int)key_held(KEY_LEFT), (int)key_held(KEY_DOWN), (int)key_held(KEY_RIGHT) );
-		write_string( write_text, 0, 2, 0 );
+		//sprintf( write_text, "P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
+		//write_string( write_text, 0, 1, 0 );
+		//sprintf( write_text, "B(%d,%d,%d,%d)  ", (int)key_held(KEY_UP), (int)key_held(KEY_LEFT), (int)key_held(KEY_DOWN), (int)key_held(KEY_RIGHT) );
+		//write_string( write_text, 0, 2, 0 );
+		
+		uint8_t i;
 		for( i = 0; i < 10; i++ ) {
 			write_character( ( 48 + i ), 0, i );
 			write_character( ( 48 + i ), 0, ( i + 10 ) );

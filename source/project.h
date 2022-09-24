@@ -10,7 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "tonc_utils.h"
+
+typedef void (*fnptr)(void);
 
 /*********************************************************************************
 	Register Definitions
@@ -74,7 +75,57 @@
 #define BG_SBB_SHIFT		0x0008
 #define BG_SBB(n)			( n << BG_SBB_SHIFT )
 
-/* REG_KEYINPUT */
+/* REG_TMxCNT */
+#define REG_TM				( (volatile TMR_REC*)( REG_BASE + 0x0100 ) )	// Timers as TMR_REC array
+
+#define REG_TM0D			*(volatile uint16_t*)( REG_BASE + 0x0100 )					// Timer 0 data
+#define REG_TM0CNT			*(volatile uint16_t*)( REG_BASE + 0x0102 )					// Timer 0 control
+#define REG_TM1D			*(volatile uint16_t*)( REG_BASE + 0x0104 )					// Timer 1 data
+#define REG_TM1CNT			*(volatile uint16_t*)( REG_BASE + 0x0106 )					// Timer 1 control
+#define REG_TM2D			*(volatile uint16_t*)( REG_BASE + 0x0108 )					// Timer 2 data
+#define REG_TM2CNT			*(volatile uint16_t*)( REG_BASE + 0x010A )					// Timer 2 control
+#define REG_TM3D			*(volatile uint16_t*)( REG_BASE + 0x010C )					// Timer 3 data
+#define REG_TM3CNT			*(volatile uint16_t*)( REG_BASE + 0x010E )					// Timer 3 control
+
+#define TM_FREQ_SYS			0x0000	// System clock timer (16.7 Mhz)
+#define TM_FREQ_1			0x0000	// 1 cycle/tick (16.7 Mhz)
+#define TM_FREQ_64			0x0001	// 64 cycles/tick (262 kHz)
+#define TM_FREQ_256			0x0002	// 256 cycles/tick (66 kHz)
+#define TM_FREQ_1024		0x0003	// 1024 cycles/tick (16 kHz)
+#define TM_CASCADE			0x0004	// Increment when preceding timer overflows
+#define TM_IRQ				0x0040	// Enable timer irq
+#define TM_ENABLE			0x0080	// Enable timer
+
+#define TM_FREQ_MASK		0x0003
+#define TM_FREQ_SHIFT		0x0000
+#define TM_FREQ(n)			( ( n ) << TM_FREQ_SHIFT )
+
+/* Interrupt Regisers */
+#define REG_WAITCNT			*(volatile uint16_t*)( REG_BASE + 0x0204 )	// Waitstate control
+#define REG_PAUSE			*(volatile uint16_t*)( REG_BASE + 0x0300 )	// Pause system (?)
+#define REG_IFBIOS			*(volatile uint16_t*)( REG_BASE - 0x0008 )	// IRQ ack for IntrWait functions
+#define REG_RESET_DST		*(volatile uint16_t*)( REG_BASE - 0x0006 )	// Destination for after SoftReset
+#define REG_ISR_MAIN		*(fnptr*)( REG_BASE - 0x0004 )				// IRQ handler address
+
+/* REG_IE, REG_IF, REG_IF_BIOS */
+typedef void (*fnptr)(void);
+
+#define IRQ_VBLANK			0x0001	// Catch VBlank irq
+#define IRQ_HBLANK			0x0002	// Catch HBlank irq
+#define IRQ_VCOUNT			0x0004	// Catch VCount irq
+#define IRQ_TIMER0			0x0008	// Catch timer 0 irq
+#define IRQ_TIMER1			0x0010	// Catch timer 1 irq
+#define IRQ_TIMER2			0x0020	// Catch timer 2 irq
+#define IRQ_TIMER3			0x0040	// Catch timer 3 irq
+#define IRQ_SERIAL			0x0080	// Catch serial comm irq
+#define IRQ_DMA0			0x0100	// Catch DMA 0 irq
+#define IRQ_DMA1			0x0200	// Catch DMA 1 irq
+#define IRQ_DMA2			0x0400	// Catch DMA 2 irq
+#define IRQ_DMA3			0x0800	// Catch DMA 3 irq
+#define IRQ_KEYPAD			0x1000	// Catch key irq
+#define IRQ_GAMEPAK			0x2000	// Catch cart irq
+
+/* Button Input Registers */
 #define KEY_A				0x0001	// Button A
 #define KEY_B				0x0002	// Button B
 #define KEY_SELECT			0x0004	// Select button
