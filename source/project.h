@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PROJECT_H_INCLUDED
+#define PROJECT_H_INCLUDED
 
 /* https://www.coranac.com/tonc/text/first.htm */
 #include <gba_console.h>
@@ -9,16 +10,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "font.h"
+#include "tonc_utils.h"
 
 /*********************************************************************************
-  Global Definitions
-*********************************************************************************/
-#define SCREEN_WIDTH   240
-#define SCREEN_HEIGHT  160
-
-/*********************************************************************************
-  Register Definitions
+	Register Definitions
 *********************************************************************************/
 #define MEM_IO				0x04000000
 #define MEM_PAL				0x05000000
@@ -97,3 +92,79 @@
 
 #define KEY_RESET			0x000F	// St+Se+A+B
 #define KEY_MASK			0x03FF
+
+/*********************************************************************************
+	VRAM Definitions
+*********************************************************************************/
+#define SCREEN_WIDTH		240
+#define SCREEN_HEIGHT		160
+
+typedef uint16_t			COLOR;
+typedef uint16_t			SCR_ENTRY, SE;
+typedef struct {
+	uint32_t data[8];
+} TILE, TILE4;
+typedef struct {
+	uint32_t data[16];
+} TILE8;
+
+typedef SCR_ENTRY			SCREENBLOCK[1024];
+typedef TILE				CHARBLOCK[512];
+typedef TILE8				CHARBLOCK8[256];
+
+#define tile_mem			( (CHARBLOCK*) MEM_VRAM )
+#define tile8_mem			( (CHARBLOCK8*) MEM_VRAM )
+
+#define se_mem				( (SCREENBLOCK*) MEM_VRAM )
+
+#define pal_bg_mem			( (COLOR*) MEM_PAL )
+
+/*********************************************************************************
+	Global Structure Definitions
+*********************************************************************************/
+
+/* Offset structures */
+struct offset_vec {
+	uint16_t n, e, s, w;
+};
+
+/* Position structures */
+struct dir_vec {
+	int16_t x, y;
+};
+struct dir_en {
+	bool travel_n, travel_e, travel_s, travel_w;
+};
+
+/* Map structures */
+struct map_tile {
+	bool top_layer;
+	bool can_walk_n;
+	bool can_walk_e;
+	bool can_walk_s;
+	bool can_walk_w; // ie can walk FROM the n/e/s/w
+	uint16_t texture;
+	uint16_t texture_offset;
+	bool texture_reverse_x;
+	bool texture_reverse_y;
+	bool interact_tile;
+	uint16_t interact_id;
+	bool npc_tile;
+	uint16_t npc_id;
+	bool exit_tile;
+	uint16_t exit_map_id;
+	struct dir_vec exit_map_dir;
+	struct dir_vec exit_map_pos;
+};
+
+struct map {
+	uint16_t map_id;
+	const struct map_tile (*map_tiles_ptr);
+	uint16_t map_height;
+	uint16_t map_width;
+	bool running_en;
+	int16_t bg_texture;
+	int16_t bg_texture_offset;
+};
+
+#endif
