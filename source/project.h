@@ -344,6 +344,12 @@ struct dir_en {
 	bool travel_n, travel_e, travel_s, travel_w;
 };
 
+/* Player structures */
+struct player_struct {
+	struct dir_vec walk_dir, face_dir;
+	bool reverse_walking_render;
+};
+
 /* Map structures */
 struct map_tile {
 	bool top_layer;
@@ -378,7 +384,7 @@ struct map {
 /*********************************************************************************
 	main.c Function Prototypes
 *********************************************************************************/
-void debug( void );
+void debugging( void );
 void update_map( void );
 
 #endif
