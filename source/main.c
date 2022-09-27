@@ -65,7 +65,6 @@ uint16_t scroll_counter;
 struct dir_vec upcoming_map_pos;
 int8_t _scroll_x, _scroll_y;
 
-
 char write_text[128];
 OBJ_ATTR obj_buffer[128];
 
@@ -142,6 +141,9 @@ void draw_map_init( void ) {
 	/* Set transparent background for foreground map at screenblock 17 (memory address 0x0600:8800) */
 	toncset16( &se_mem[17][0], 0, 2048 );
 
+	/* Set transparent background for top layer at screenblock 18 (memory address 0x0600:9000) */
+	toncset16( &se_mem[18][0], 0, 2048 );
+
 	/* Calculate the background texture offset */
 	_bg_texture_offset = 0;
 	if( _current_map->bg_texture != -1 ) {
@@ -171,7 +173,7 @@ void draw_map_init( void ) {
 						set_tile( _draw_x, _draw_y, _bg_texture_offset, 0, 0, 16 );
 
 					/* Make sure there's a texture to draw */
-					if( ( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) /*&& ( (*map_tiles_ptr).top_layer == false)*/ ) {
+					if( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) {
 
 						/* Calculate the texture offset */
 						_texture_offset = 0;
@@ -180,7 +182,17 @@ void draw_map_init( void ) {
 						}
 						_texture_offset += (*map_tiles_ptr).texture_offset;
 
-						set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
+						if( (*map_tiles_ptr).top_layer ) {
+
+							/* Top Layer texture, draw to the top layer map */
+							set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 18 );
+						} else {
+
+							/* Bottom Layer texture, draw to the normal map */
+							set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
+						}
+
+						
 					}
 
 					/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
@@ -196,7 +208,7 @@ void draw_map_init( void ) {
 void set_player_sprite( uint8_t offset, bool flip_h ) {
 
 	/* Update the offset of the player sprite */
-	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( offset * 8 ) ) );
+	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( offset * 8 ) | ATTR2_PRIO( 1 ) ) );
 	obj_set_pos( player_sprite, 112, 72 );
 }
 
@@ -222,8 +234,10 @@ int main()
 	toncset16( &se_mem[16][0], 0, 2048 );
 	/* Clear foreground map at screenblock 17 (memory address 0x0600:8800) */
 	toncset16( &se_mem[17][0], 0, 2048 );
-	/* Clear debug overlay at screenblock 18 (memory address 0x0600:9000) */
+	/* Clear top layer at screenblock 18 (memory address 0x0600:9000) */
 	toncset16( &se_mem[18][0], 0, 2048 );
+	/* Clear debug overlay at screenblock 19 (memory address 0x0600:9800) */
+	toncset16( &se_mem[19][0], 0, 2048 );
 
 	/*********************************************************************************
 		Initialisation
@@ -257,11 +271,13 @@ int main()
 	timer_count = 0;
 
 	/* Configure BG0 using charblock 1 and screenblock 16 - background */
-	REG_BG0CNT = BG_CBB(1) | BG_SBB(16) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
+	REG_BG0CNT = BG_CBB(1) | BG_SBB(16) | BG_8BPP | BG_REG_32x32 | BG_PRIO(3);
 	/* Configure BG1 using charblock 1 and screenblock 17 - foreground */
-	REG_BG1CNT = BG_CBB(1) | BG_SBB(17) | BG_8BPP | BG_REG_32x32 | BG_PRIO(1);
-	/* Configure BG2 using charblock 0 and screenblock 18 - debug overlay */
-	REG_BG2CNT = BG_CBB(0) | BG_SBB(18) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
+	REG_BG1CNT = BG_CBB(1) | BG_SBB(17) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
+	/* Configure BG2 using charblock 1 and screenblock 18 - top layer */
+	REG_BG2CNT = BG_CBB(1) | BG_SBB(18) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
+	/* Configure BG3 using charblock 0 and screenblock 19 - debug overlay */
+	REG_BG3CNT = BG_CBB(0) | BG_SBB(19) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
 	/* Set BG0 position */
 	REG_BG0HOFS = 0;
@@ -269,12 +285,15 @@ int main()
 	/* Set BG1 position */
 	REG_BG1HOFS = 0;
 	REG_BG1VOFS = 0;
+	/* Set BG2 position */
+	REG_BG2HOFS = 0;
+	REG_BG2VOFS = 0;
 
-	/* Set bitmap mode to 0 and show backgrounds 0 and 1, add sprites */
-	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_1D;
+	/* Set bitmap mode to 0 and show all backgrounds and show sprites */
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	_current_map = &map_list[0];
+	_current_map = &map_list[2];
 	map_pos = (struct dir_vec){ 0, 0 };
 	draw_map_init();
 
@@ -525,6 +544,9 @@ int main()
 
 		REG_BG1HOFS = ( 8 * ( map_pos.x - 14 ) ) + _scroll_x;
 		REG_BG1VOFS = ( 8 * ( map_pos.y - 9 ) ) + _scroll_y;
+
+		REG_BG2HOFS = ( 8 * ( map_pos.x - 14 ) ) + _scroll_x;
+		REG_BG2VOFS = ( 8 * ( map_pos.y - 9 ) ) + _scroll_y;
 
 		/* Update player sprite */
 		oam_copy( oam_mem, obj_buffer, 1 );
