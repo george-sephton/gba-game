@@ -333,7 +333,7 @@ int main()
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec){ 20, 22 };
+	map_pos = (struct dir_vec){ 14, 14 };
 	_current_map = &map_list[2];
 
 	draw_map_init();
@@ -587,17 +587,51 @@ int main()
 			/* Get the current map tile pointer, starting at (0, 0) */
 			const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
 
-			/* Move the map pointer to the first row on the display */
-			if( _screen_offsets.n == 0 )
-				map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
-
 			/* Player's walking north, let's add another row of tiles at the top of the buffer */
 			if( upcoming_map_pos.y == ( -1 * move_multiplier ) ) {
 
-				
+				/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
+				if( _screen_offsets.w == 0 )
+					map_tiles_ptr += ( map_pos.x - 14 );
+
+				/* Check if we have another column of tiles to show */
+				if( map_pos.y >= 10 ) {
+
+					/* Move the map pointer to new row */
+					map_tiles_ptr += ( ( map_pos.y - 10 ) * _current_map->map_width );
+
+					/* Loop through each of the 30 columns (x-direction) */
+					for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+
+						/* Ignore tiles outside of the map limits */
+						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
+
+							/* Draw map tile */
+							draw_map_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, map_tiles_ptr );
+
+							/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
+							if( _draw_x != 29 ) map_tiles_ptr++;
+						}
+					}
+
+				/* Nothing to show, so draw black tiles */
+				} else {
+
+					/* Loop through each of the 30 columns (x-direction) */
+					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
+						
+						/* Ignore tiles outside of the map limits */
+						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, 0, 0, 0, 17 ); // Foreground Layer - transparent
+					}
+				}
 
 			/* Player's walking east, let's add another column of tiles on the right side of the buffer */
 			} else if( upcoming_map_pos.x == ( 1 * move_multiplier ) ) {
+
+				/* Move the map pointer to the first row on the display */
+				if( _screen_offsets.n == 0 )
+					map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
 
 				/* Check if we have another column of tiles to show */
 				if( ( map_pos.x + 16 ) < _current_map->map_width ) {
@@ -622,25 +656,59 @@ int main()
 				} else {
 
 					/* Loop through each of the 20 rows of the display (y-direction) */
-					for( _draw_y = 0; _draw_y < 20; _draw_y++ ) {
+					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
-							
-							set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
-							set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
-						}
+						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
-
 				}
 
 			/* Player's walking south, let's add another row of tiles at the bottom of the buffer */
 			} else if( upcoming_map_pos.y == ( 1 * move_multiplier ) ) {
 
-				
+				/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
+				if( _screen_offsets.w == 0 )
+					map_tiles_ptr += ( map_pos.x - 14 );
+
+				/* Check if we have another column of tiles to show */
+				if( ( map_pos.y + 11 ) < _current_map->map_height ) {
+
+					/* Move the map pointer to new row */
+					map_tiles_ptr += ( ( map_pos.y + 11 ) * _current_map->map_width );
+
+					/* Loop through each of the 30 columns (x-direction) */
+					for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+
+						/* Ignore tiles outside of the map limits */
+						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
+
+							/* Draw map tile */
+							draw_map_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, map_tiles_ptr );
+
+							/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
+							if( _draw_x != 29 ) map_tiles_ptr++;
+						}
+					}
+
+				/* Nothing to show, so draw black tiles */
+				} else {
+
+					/* Loop through each of the 30 columns (x-direction) */
+					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
+						
+						/* Ignore tiles outside of the map limits */
+						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, 0, 0, 0, 17 ); // Foreground Layer - transparent
+					}
+				}
 
 			/* Player's walking west, let's add another column of tiles on the left side of the buffer */
 			} else if( upcoming_map_pos.x == ( -1 * move_multiplier ) ) {
+
+				/* Move the map pointer to the first row on the display */
+				if( _screen_offsets.n == 0 )
+					map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
 
 				/* Check if we have another column of tiles to show */
 				if( map_pos.x >= 16 ) {
@@ -665,17 +733,15 @@ int main()
 				} else {
 
 					/* Loop through each of the 20 rows of the display (y-direction) */
-					for( _draw_y = 0; _draw_y < 20; _draw_y++ ) {
+					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
-							
-							set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
-							set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
-						}
+						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 
 				}
+
 			}
 		}
 		
