@@ -12,7 +12,7 @@
 /*********************************************************************************
 	Debugging Definitions
 *********************************************************************************/
-#define map_coordinates					false	// Displays the coordinates of the display
+#define map_coordinates					true	// Displays the coordinates of the display
 #define map_rendering_offsets			true	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
 #define map_rendering_scroll			false	// Displays player position on map and no of calculated extra pixels to render 
 #define player_movement					true	// Displays player position
@@ -316,7 +316,7 @@ int main()
 	REG_BG1CNT = BG_CBB(1) | BG_SBB(17) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
 	/* Configure BG2 using charblock 1 and screenblock 18 - top layer */
 	REG_BG2CNT = BG_CBB(1) | BG_SBB(18) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
-	/* Configure BG3 using charblock 0 and screenblock 19 - debug overlay */
+	/* Configure BG3 using charblock 0 and screenblock 19 - menu/dialog/debug overlay */
 	REG_BG3CNT = BG_CBB(0) | BG_SBB(19) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
 	/* Set BG0 position */
@@ -328,12 +328,15 @@ int main()
 	/* Set BG2 position */
 	REG_BG2HOFS = 0;
 	REG_BG2VOFS = 0;
+	/* Set BG3 position */
+	REG_BG3HOFS = 0;
+	REG_BG3VOFS = 0;
 
 	/* Set bitmap mode to 0 and show all backgrounds and show sprites */
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec){ 14, 14 };
+	map_pos = (struct dir_vec){ 16, 10 };
 	_current_map = &map_list[2];
 
 	draw_map_init();
@@ -600,8 +603,8 @@ int main()
 					/* Move the map pointer to new row */
 					map_tiles_ptr += ( ( map_pos.y - 10 ) * _current_map->map_width );
 
-					/* Loop through each of the 30 columns (x-direction) */
-					for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+					/* Loop through the 32 columns of the buffer (x-direction) */
+					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 
 						/* Ignore tiles outside of the map limits */
 						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
@@ -617,7 +620,7 @@ int main()
 				/* Nothing to show, so draw black tiles */
 				} else {
 
-					/* Loop through each of the 30 columns (x-direction) */
+					/* Loop through the 32 columns of the display (x-direction) */
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 						
 						/* Ignore tiles outside of the map limits */
@@ -652,15 +655,16 @@ int main()
 								map_tiles_ptr += ( _current_map->map_width );
 						}
 					}
+
 				/* Nothing to show, so draw black tiles */
 				} else {
 
-					/* Loop through each of the 20 rows of the display (y-direction) */
+					/* Loop through the 32 rows of the display (y-direction) */
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 				}
 
@@ -677,8 +681,8 @@ int main()
 					/* Move the map pointer to new row */
 					map_tiles_ptr += ( ( map_pos.y + 11 ) * _current_map->map_width );
 
-					/* Loop through each of the 30 columns (x-direction) */
-					for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+					/* Loop through the 32 columns of the buffer (x-direction) */
+					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 
 						/* Ignore tiles outside of the map limits */
 						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
@@ -694,7 +698,7 @@ int main()
 				/* Nothing to show, so draw black tiles */
 				} else {
 
-					/* Loop through each of the 30 columns (x-direction) */
+					/* Loop through the 32 columns of the display (x-direction) */
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 						
 						/* Ignore tiles outside of the map limits */
@@ -729,23 +733,21 @@ int main()
 								map_tiles_ptr += ( _current_map->map_width );
 						}
 					}
+
 				/* Nothing to show, so draw black tiles */
 				} else {
 
-					/* Loop through each of the 20 rows of the display (y-direction) */
+					/* Loop through the 32 rows of the display (y-direction) */
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( (30 + ( scroll_pos.x )) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 
 				}
-
 			}
 		}
-		
-		calculate_map_offsets();
 
 		/* Scroll display */
 		_scroll_x = player.walk_dir.x * scroll_counter;
