@@ -38,6 +38,10 @@ static inline uint16_t rgb(uint32_t colour) {
 	return 0x0 | ( ( ( ( ( colour >> 16 ) & 0xFF) / 8 ) << 0 ) | ( ( ( ( colour >> 8 ) & 0xFF) / 8 ) << 5 ) | ( ( ( colour & 0xFF) / 8 ) << 10 ) );
 }
 
+static inline int g_mod( int k, int n ) {
+	return( ( k %= n ) < 0 ) ? k + n : k;
+}
+
 /*********************************************************************************
 	Global Variables
 *********************************************************************************/
@@ -172,6 +176,10 @@ void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile (*ma
 			/* Bottom Layer texture, draw to the normal map */
 			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
 		}
+	} else {
+
+		/* If not, draw a transparent tile to ensure we're not showing old tiles in the buffer */
+		set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
 	}
 }
 
@@ -359,6 +367,28 @@ int main()
 		/* Show debugger */
 		debugging();
 
+		/* Development Refresh display when B is pressed */
+		if( key_down( KEY_B ) ) {
+
+			draw_map_init();
+
+			/* Re-initialise variables */
+			scroll_pos = (struct dir_vec){ 0, 0 }; 
+
+			/* Set BG0 position */
+			REG_BG0HOFS = 0;
+			REG_BG0VOFS = 0;
+			/* Set BG1 position */
+			REG_BG1HOFS = 0;
+			REG_BG1VOFS = 0;
+			/* Set BG2 position */
+			REG_BG2HOFS = 0;
+			REG_BG2VOFS = 0;
+			/* Set BG3 position */
+			REG_BG3HOFS = 0;
+			REG_BG3VOFS = 0;
+		}
+
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
 		if( /*( !animation.running ) &&*/ ( !scroll_movement ) /*&& ( !textbox_running )*/ ) {
 
@@ -436,7 +466,7 @@ int main()
 
 			/* Player is walking, draw the walking sprite */
 			if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) ) ) { // Walking N
-					set_player_sprite( 5, player.reverse_walking_render );
+				set_player_sprite( 5, player.reverse_walking_render );
 			} else if( ( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) ) ) { // Walking E
 				set_player_sprite( ( player.reverse_walking_render ? 2 : 3 ), true );
 			} else if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) ) ) { // Walking S
@@ -610,7 +640,7 @@ int main()
 						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
 
 							/* Draw map tile */
-							draw_map_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, map_tiles_ptr );
+							draw_map_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), map_tiles_ptr );
 
 							/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
 							if( _draw_x != 29 ) map_tiles_ptr++;
@@ -624,8 +654,8 @@ int main()
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 31 + ( scroll_pos.y ) ) % 32, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 				}
 
@@ -648,7 +678,7 @@ int main()
 						/* Ignore tiles outside of the map limits */
 						if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
 							
-							draw_map_tile( ( 30 + scroll_pos.x ) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), map_tiles_ptr );
+							draw_map_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), g_mod( ( _draw_y + scroll_pos.y ), 32 ), map_tiles_ptr );
 
 							/* Increment the pointer as we move to the next row on the dislay, but if we're drawing the last row, then don't move the pointer either */
 							if( _draw_y != 19 ) 
@@ -663,8 +693,8 @@ int main()
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 				}
 
@@ -687,8 +717,8 @@ int main()
 						/* Ignore tiles outside of the map limits */
 						if( ( _draw_x >= _screen_offsets.w ) && ( _draw_x <= ( 29 - _screen_offsets.e ) ) ) {
 
-							/* Draw map tile */
-							draw_map_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, map_tiles_ptr );
+							/* Draw map tile - add 32 to the coordinates to ensure we don't end up with negative values */
+							draw_map_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), map_tiles_ptr );
 
 							/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
 							if( _draw_x != 29 ) map_tiles_ptr++;
@@ -702,8 +732,8 @@ int main()
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( ( ( _draw_x + scroll_pos.x ) % 32 ), ( 20 + ( scroll_pos.y ) ) % 32, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
 					}
 				}
 
@@ -715,7 +745,7 @@ int main()
 					map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
 
 				/* Check if we have another column of tiles to show */
-				if( map_pos.x >= 16 ) {
+				if( map_pos.x >= 15 ) {
 
 					/* Move the map pointer to new column */
 					map_tiles_ptr += ( map_pos.x - 15 );
@@ -726,7 +756,7 @@ int main()
 						/* Ignore tiles outside of the map limits */
 						if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
 							
-							draw_map_tile( ( 31 + ( scroll_pos.x ) ) % 32, ( ( _draw_y + scroll_pos.y ) % 32 ), map_tiles_ptr );
+							draw_map_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), g_mod( ( _draw_y + scroll_pos.y ), 32 ), map_tiles_ptr );
 
 							/* Increment the pointer as we move to the next row on the dislay, but if we're drawing the last row, then don't move the pointer either */
 							if( _draw_y != 19 ) 
@@ -741,13 +771,15 @@ int main()
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( (30 + ( scroll_pos.x )) % 32, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+
 					}
 
 				}
 			}
 		}
+		calculate_map_offsets();
 
 		/* Scroll display */
 		_scroll_x = player.walk_dir.x * scroll_counter;
