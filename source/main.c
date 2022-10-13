@@ -10,18 +10,18 @@
 /*********************************************************************************
 	Debugging Definitions
 *********************************************************************************/
-#define map_coordinates					true	// Displays the coordinates of the display
-#define map_rendering_offsets			true	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
-#define map_rendering_scroll			false	// Displays player position on map and no of calculated extra pixels to render 
-#define player_movement					true	// Displays player position
-#define player_position					false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
-#define interaction_info				false	// Displays information about interaction tiles
-#define exit_map_info					false	// Displays information about the map to load if exiting current map
-#define animation_info					false	// Displays information about the running animation
-#define textbox_info					false	// Displays information about the current textbox
-#define npc_info						false	// Displays information about the NPC
-#define key_info						false	// Displays information about the keys being pressed
-#define tick_info						false	// Displays various timer ticks
+#define map_coordinates                 true	// Displays the coordinates of the display
+#define map_rendering_offsets           true	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
+#define map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
+#define player_movement                 true	// Displays player position
+#define player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
+#define interaction_info                false	// Displays information about interaction tiles
+#define exit_map_info                   false	// Displays information about the map to load if exiting current map
+#define animation_info                  false	// Displays information about the running animation
+#define textbox_info                    false	// Displays information about the current textbox
+#define npc_info                        false	// Displays information about the NPC
+#define key_info                        false	// Displays information about the keys being pressed
+#define tick_info                       false	// Displays various timer ticks
 
 /*********************************************************************************
 	Helpful Functions
@@ -61,12 +61,12 @@ struct offset_vec _screen_offsets;
 //int16_t interaction_tile_id[4];
 uint8_t player_animation_tick, player_movement_delay;
 
-#define move_multiplier					1 // Defines how many spaces to move at a time
-#define player_movement_delay_val		5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
+#define move_multiplier                 2 // Defines how many spaces to move at a time
+#define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
 
 /* Movement scrolling animation */
 bool scroll_movement;
-uint16_t scroll_counter;
+uint16_t scroll_counter, move_tile_counter;
 struct dir_vec upcoming_map_pos;
 int8_t _scroll_x, _scroll_y;
 
@@ -309,6 +309,7 @@ int main()
 	player_movement_delay = 0;
 	bool scroll_movement = false;
 	scroll_counter = 0;
+	move_tile_counter = 0;
 	upcoming_map_pos.x = 0;
 	upcoming_map_pos.y = 0;
 
@@ -341,7 +342,7 @@ int main()
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec){ 16, 10 };
+	map_pos = (struct dir_vec){ 10, 16 };
 	_current_map = &map_list[2];
 
 	draw_map_init();
@@ -488,7 +489,7 @@ int main()
 					//if( allowed_movement.travel_n ) {
 
 						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.y = -1 * move_multiplier;
+						upcoming_map_pos.y = -1;
 						scroll_movement = true;
 						player_animation_tick = 0;
 					//}
@@ -506,7 +507,7 @@ int main()
 					//if( allowed_movement.travel_e ) {
 						
 						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.x = 1 * move_multiplier;
+						upcoming_map_pos.x = 1;
 						scroll_movement = true;
 						player_animation_tick = 0;
 					//}
@@ -524,7 +525,7 @@ int main()
 					//if( allowed_movement.travel_s)  {
 						
 						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.y = 1 * move_multiplier;
+						upcoming_map_pos.y = 1;
 						scroll_movement = true;
 						player_animation_tick = 0;
 					//}
@@ -542,7 +543,7 @@ int main()
 					//if( allowed_movement.travel_w ) {
 						
 						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.x = -1 * move_multiplier;
+						upcoming_map_pos.x = -1;
 						scroll_movement = true;
 						player_animation_tick = 0;
 					//}
@@ -565,10 +566,25 @@ int main()
 				/*if( ( button( B ) ) && ( _current_map->running_en ) ) scroll_counter += 2;
 				else*/ scroll_counter++;
 
-				if( scroll_counter >= ( 8 * move_multiplier ) ) {
+				/* Scroll display */
+				_scroll_x = player.walk_dir.x * ( scroll_counter % 8 );
+				_scroll_y = -player.walk_dir.y * ( scroll_counter % 8 );
 
-					/* Reset the counter and increment our scroll position */
-					scroll_counter = 0;
+				REG_BG0HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG0VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				REG_BG1HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG1VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				REG_BG2HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG2VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				if( ( scroll_counter % 8 ) == 7 ) {
+
+					/* Count how many tiles we've moved so far */
+					move_tile_counter++;
+
+					/* Update the scroll as the tiles are updated 1 row/column at a time according to the scroll count */
 					scroll_pos.x += upcoming_map_pos.x;
 					scroll_pos.y += upcoming_map_pos.y;
 
@@ -576,19 +592,26 @@ int main()
 					map_pos.x += upcoming_map_pos.x;
 					map_pos.y += upcoming_map_pos.y;
 
-					/* If the player isn't holding down a button, let's stop moving */
-					if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
-							( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_RIGHT ) ) ) ||
-							( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( !key_down( KEY_DOWN ) ) ) ||
-							( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_LEFT ) ) )
-						) {
-			
-						scroll_movement = false;
-						upcoming_map_pos.x = 0;
-						upcoming_map_pos.y = 0;
+					if( move_tile_counter == move_multiplier ) {
 
-						player.walk_dir.x = 0;
-						player.walk_dir.y = 0;
+						/* Time to stop moving, reset the counters */
+						scroll_counter = 0;
+						move_tile_counter = 0;
+
+						/* If the player isn't holding down a button, let's stop moving */
+						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
+								( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_RIGHT ) ) ) ||
+								( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( !key_down( KEY_DOWN ) ) ) ||
+								( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_LEFT ) ) )
+							) {
+				
+							scroll_movement = false;
+							upcoming_map_pos.x = 0;
+							upcoming_map_pos.y = 0;
+
+							player.walk_dir.x = 0;
+							player.walk_dir.y = 0;
+						}
 					}
 				}
 			}
@@ -618,7 +641,7 @@ int main()
 			const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
 
 			/* Player's walking north, let's add another row of tiles at the top of the buffer */
-			if( upcoming_map_pos.y == ( -1 * move_multiplier ) ) {
+			if( upcoming_map_pos.y < 0 ) {
 
 				/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
 				if( _screen_offsets.w == 0 )
@@ -657,7 +680,7 @@ int main()
 				}
 
 			/* Player's walking east, let's add another column of tiles on the right side of the buffer */
-			} else if( upcoming_map_pos.x == ( 1 * move_multiplier ) ) {
+			} else if( upcoming_map_pos.x > 0 ) {
 
 				/* Move the map pointer to the first row on the display */
 				if( _screen_offsets.n == 0 )
@@ -696,7 +719,7 @@ int main()
 				}
 
 			/* Player's walking south, let's add another row of tiles at the bottom of the buffer */
-			} else if( upcoming_map_pos.y == ( 1 * move_multiplier ) ) {
+			} else if( upcoming_map_pos.y > 0 ) {
 
 				/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
 				if( _screen_offsets.w == 0 )
@@ -735,7 +758,7 @@ int main()
 				}
 
 			/* Player's walking west, let's add another column of tiles on the left side of the buffer */
-			} else if( upcoming_map_pos.x == ( -1 * move_multiplier ) ) {
+			} else if( upcoming_map_pos.x < 0 ) {
 
 				/* Move the map pointer to the first row on the display */
 				if( _screen_offsets.n == 0 )
@@ -776,20 +799,6 @@ int main()
 				}
 			}
 		}
-		calculate_map_offsets();
-
-		/* Scroll display */
-		_scroll_x = player.walk_dir.x * scroll_counter;
-		_scroll_y = -player.walk_dir.y * scroll_counter;
-
-		REG_BG0HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-		REG_BG0VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
-
-		REG_BG1HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-		REG_BG1VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
-
-		REG_BG2HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-		REG_BG2VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
 
 		/* Update player sprite */
 		oam_copy( oam_mem, obj_buffer, 1 );
