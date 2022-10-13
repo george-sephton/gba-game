@@ -10,14 +10,14 @@
 /*********************************************************************************
 	Debugging Definitions
 *********************************************************************************/
-#define map_coordinates                 true	// Displays the coordinates of the display
-#define map_rendering_offsets           true	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
+#define map_coordinates                 false	// Displays the coordinates of the display
+#define map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
 #define map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
-#define player_movement                 true	// Displays player position
+#define player_movement                 false	// Displays player position
 #define player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
 #define interaction_info                false	// Displays information about interaction tiles
 #define exit_map_info                   false	// Displays information about the map to load if exiting current map
-#define animation_info                  false	// Displays information about the running animation
+#define animation_info                  true	// Displays information about the running animation
 #define textbox_info                    false	// Displays information about the current textbox
 #define npc_info                        false	// Displays information about the NPC
 #define key_info                        false	// Displays information about the keys being pressed
@@ -60,6 +60,9 @@ struct offset_vec _screen_offsets;
 //struct dir_en allowed_movement, exit_tile, interaction_tile;
 //int16_t interaction_tile_id[4];
 uint8_t player_animation_tick, player_movement_delay;
+
+/* Animation */
+struct animation_settings animation;
 
 #define move_multiplier                 2 // Defines how many spaces to move at a time
 #define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
@@ -113,6 +116,11 @@ void debugging( void ) {
 	#if tick_info
 		sprintf( write_text, " D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)game_tick );
 		write_string( write_text, 0, 2, 0 );
+	#endif
+
+	#if animation_info
+		sprintf( write_text,"R(%d,%d)F(%d)S(%d)T(%d,%d)", animation.running, animation.reverse, animation.finished, animation.step, animation.tick % animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
+		write_string( write_text, 0, 0, 0 );
 	#endif
 
 	#if map_rendering_offsets
@@ -258,6 +266,41 @@ void set_player_sprite( uint8_t offset, bool flip_h ) {
 	obj_set_pos( player_sprite, 112, 72 );
 }
 
+void fade_screen( void ) {
+
+	uint16_t i, j;
+	uint8_t step;
+	uint8_t hexRed, hexGreen, hexBlue;
+	uint8_t hexDRed, hexDGreen, hexDBlue;
+
+	/* Get the current step */
+	if( animation.reverse ) step = animation.step;
+	else step = (0x7 ^ animation.step) - 4;
+
+	if( ( animation.step >= 0 ) && ( animation.step <= 5 ) ) {
+		
+		for( i = 0; i < sizeof( _texture_colour_palette ); i++ ) {
+
+			hexRed = ((( _texture_colour_palette[ i ] >> 0 ) & 0x1F) * 8 );
+			hexGreen = ((( _texture_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
+			hexBlue = ((( _texture_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
+
+			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
+			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
+			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
+
+			pal_bg_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue << 0 ) );
+		}
+
+		if( !( animation.tick % animation.occurance ) ) {
+			
+			/* Advance the animation, unless it's finished */
+			if( animation.step == 5 ) animation.finished = true;
+			else animation.step++;
+		}
+	}
+}
+
 int main()
 {
 	/*********************************************************************************
@@ -354,6 +397,9 @@ int main()
 	irq_init(master_isrs[0]);
 	irq_add(II_TIMER0, timr0_callback);
 
+	/* Initialise animation variables - none in progress */
+	animation.running = false;
+
 	/*********************************************************************************
 		Game Loop
 	*********************************************************************************/
@@ -365,7 +411,7 @@ int main()
 		/* Show debugger */
 		debugging();
 
-		/* Development Refresh display when B is pressed */
+		/* Development - Refresh display when B is pressed */
 		if( key_down( KEY_B ) ) {
 
 			draw_map_init();
@@ -387,8 +433,20 @@ int main()
 			REG_BG3VOFS = 0;
 		}
 
+		/* Development - Fade display out when A is pressed */
+		if( key_down( KEY_A ) ) {
+
+			animation.running = true;
+			animation.finished = false;
+			animation.reverse = true;
+			animation.animation_ptr = fade_screen;
+			animation.step = 0;
+			animation.tick = 1; // Set to 1 to avoid triggering straight away - I might change this later
+			animation.occurance = 3;
+		}
+
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
-		if( /*( !animation.running ) &&*/ ( !scroll_movement ) /*&& ( !textbox_running )*/ ) {
+		if( ( !animation.running ) && ( !scroll_movement ) /*&& ( !textbox_running )*/ ) {
 
 			if( ( key_down( KEY_UP ) ) || ( key_down( KEY_RIGHT ) ) || ( key_down( KEY_DOWN ) ) || ( key_down( KEY_LEFT ) ) ) {
 
@@ -441,7 +499,6 @@ int main()
 		/*********************************************************************************
 			Drawing
 		*********************************************************************************/
-
 		/* Draw the player in the centre square */
 		if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 0 ) ) || ( player_movement_delay < player_movement_delay_val ) ) {
 
@@ -475,7 +532,7 @@ int main()
 		}
 
 		/* Move the player according to button inputs and movement restrictions */
-		if( /*( !animation.running ) && ( !textbox_running ) &&*/ ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
+		if( ( !animation.running ) && /*( !textbox_running ) &&*/ ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
 
 			/* Player is moving north */
 			if( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) ) {
@@ -551,6 +608,10 @@ int main()
 			}
 		}
 
+		/* Advance the animation, if running and not finished */
+		if( ( animation.running ) && ( !animation.finished ) ) 
+			animation.tick++;
+
 		/* Deal with timer, allows us to do animations etc a bit more precisely and not too fast */
 		if( timer_count >= 5 ) {
 			
@@ -616,8 +677,21 @@ int main()
 				}
 			}
 
+			/* An animation is running */
+			if( animation.running ) {
+				
+				/* Call animation function */
+				animation.animation_ptr();
+
+				/* Check if animation has finished */
+				if( animation.finished ) {
+					
+					animation.running = false;
+				}
+			}
+
 			/* If the player is walking, let's make their little legs move or make them run if holding B */
-			if( /*( !animation.running ) ||*/ ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
+			if( ( !animation.running ) || ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
 
 				player_animation_tick++;
 

@@ -354,6 +354,19 @@ struct player_struct {
 	bool reverse_walking_render;
 };
 
+/* Animation structures */
+typedef void ( *animation_function )( void );
+
+struct animation_settings{
+	bool running;
+	bool finished;
+	bool reverse;
+	uint8_t tick;
+	uint8_t occurance;
+	uint8_t step;
+	animation_function animation_ptr;
+};
+
 /* Map structures */
 struct map_tile {
 	bool top_layer;
