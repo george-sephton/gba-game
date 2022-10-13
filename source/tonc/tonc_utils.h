@@ -2,7 +2,7 @@
 #define TONC_UTILS_H_INCLUDED
 
 // Include assets
-#include "project.h"
+#include "../project.h"
 
 // Create a bitmask \a len bits long
 #define BIT_MASK(len)		( BIT(len)-1 )

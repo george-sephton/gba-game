@@ -1,7 +1,6 @@
 #ifndef SPRITES_H_INCLUDED
 #define SPRITES_H_INCLUDED
 
-// Include assets
 #include "project.h"
 
 typedef struct OBJ_ATTR

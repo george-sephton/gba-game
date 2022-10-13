@@ -1,13 +1,11 @@
 #include "project.h"
 
-#include "demo_project.h"
-#include "font.h"
-#include "keys.h"
-#include "sprites.h"
-#include "text.h"
+#include "include/keys.h"
+#include "include/sprites.h"
+#include "include/text.h"
 
-#include "tonc_utils.h"
-#include "tonc_irq.h"
+#include "assets/font.h"
+#include "assets/demo_project.h"
 
 /*********************************************************************************
 	Debugging Definitions
@@ -187,7 +185,7 @@ void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile (*ma
 void draw_map_init( void ) {
 
 	/* Clears the display display buffer and draws the map */
-	int16_t _draw_x, _draw_y, _texture_offset, i;
+	int16_t _draw_x, _draw_y, i;
 
 	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
 	toncset16( &se_mem[16][0], 1, 2048 );
@@ -290,7 +288,6 @@ int main()
 		Initialisation
 	*********************************************************************************/
 	/* Initialise our variables */
-	uint8_t scroll = 0;
 	__key_curr = 0;
 	scroll_pos = (struct dir_vec){ 0, 0 }; 
 

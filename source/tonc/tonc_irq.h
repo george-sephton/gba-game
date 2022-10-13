@@ -12,7 +12,7 @@
 #define TONC_IRQ
 
 // Include assets
-#include "project.h"
+#include "../project.h"
 
 
 // --------------------------------------------------------------------

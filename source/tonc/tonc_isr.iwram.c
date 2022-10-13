@@ -7,7 +7,7 @@
 //   Create an extra rule to compile as ARM code
 
 // Include assets
-#include "project.h"
+#include "../project.h"
 #include "tonc_irq.h"
 
 IWRAM_CODE void hbl_grad_direct();

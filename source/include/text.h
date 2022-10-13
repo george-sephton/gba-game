@@ -1,7 +1,6 @@
 #ifndef TEXT_H_INCLUDED
 #define TEXT_H_INCLUDED
 
-// Include assets
 #include "project.h"
 
 /* Text functions */

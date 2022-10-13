@@ -10,7 +10,7 @@
 //   saving/clearing REG_IME and end with restoring it. If it doesn't 
 //   it's a fair bet that I screwed up :(
 
-#include "tonc_irq.h"
+#include "tonc/tonc_irq.h"
 
 
 // --------------------------------------------------------------------

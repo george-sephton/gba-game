@@ -1,7 +1,7 @@
 #ifndef PROJECT_H_INCLUDED
 #define PROJECT_H_INCLUDED
 
-/* https://www.coranac.com/tonc/text/first.htm */
+/* Include GBA sources */
 #include <gba_console.h>
 #include <gba_video.h>
 #include <gba_interrupt.h>
@@ -12,6 +12,10 @@
 #include <string.h>
 
 typedef void (*fnptr)(void);
+
+/* Include Tonc sources: https://www.coranac.com/tonc/text/ */
+#include "tonc/tonc_utils.h"
+#include "tonc/tonc_irq.h"
 
 /*********************************************************************************
 	Register Definitions

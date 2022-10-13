@@ -1,7 +1,6 @@
 #ifndef KEYS_H_INCLUDED
 #define KEYS_H_INCLUDED
 
-// Include assets
 #include "project.h"
 
 extern uint16_t __key_curr;
