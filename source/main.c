@@ -52,8 +52,8 @@ OBJ_ATTR obj_buffer[ 128 ];
 	Timer Variables
 *********************************************************************************/
 /* Timer IRQ Prototypes */
-__attribute__((section(".iwram"), long_call)) void isr_master();
-__attribute__((section(".iwram"), long_call)) void timr0_callback();
+__attribute__ ( ( section( ".iwram" ), long_call ) ) void isr_master();
+__attribute__ ( ( section( ".iwram" ), long_call ) ) void timr0_callback();
 
 void timr0_callback( void ) {
 	
@@ -64,179 +64,15 @@ void timr0_callback( void ) {
 }
 
 const fnptr master_isrs[2] = {
-	(fnptr)isr_master,
-	(fnptr)timr0_callback 
+	(fnptr) isr_master,
+	(fnptr) timr0_callback 
 };
 
 /*********************************************************************************
 	Game Functions
 *********************************************************************************/
-void debugging( void ) {
-
-	#if d_player_movement
-		sprintf( write_text, " P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
-		write_string( write_text, 0, 0, 0 );
-	#endif
-
-	#if d_key_info
-		sprintf( write_text, " K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
-		write_string( write_text, 0, 1, 0 );
-	#endif
-
-	#if d_tick_info
-		sprintf( write_text, " D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)game_tick );
-		write_string( write_text, 0, 2, 0 );
-	#endif
-
-	#if d_animation_info
-		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
-		write_string( write_text, 0, 0, 0 );
-	#endif
-
-	#if d_map_rendering_offsets
-		sprintf( write_text, " P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
-		write_string( write_text, 0, 1, 0 );
-	#endif
-	
-	#if d_map_coordinates
-		uint8_t i;
-		for( i = 0; i < 10; i++ ) {
-			write_character( ( 48 + i ), 0, i );
-			write_character( ( 48 + i ), 0, ( i + 10 ) );
-		}
-		sprintf( write_text, "012345678901234567890123456789" );
-		write_string( write_text, 0, 19, 0 );
-	#endif
-}
-
-void calculate_map_offsets( void ) {
-
-	_screen_offsets = (struct offset_vec){ 0, 0, 0, 0 };
-
-	if( map_pos.y < 9 )
-		_screen_offsets.n = ( 9 - map_pos.y );
-
-	if( ( map_pos.x + 16 ) > _current_map->map_width )
-		_screen_offsets.e = ( map_pos.x + 16 - _current_map->map_width );
-
-	if( ( map_pos.y + 12 ) > _current_map->map_height )
-		_screen_offsets.s = ( map_pos.y + 11 - _current_map->map_height );
-
-	if( map_pos.x < 14 )
-		_screen_offsets.w = ( 14 - map_pos.x );
-}
-
-void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile (*map_tiles_ptr) ) {
-
-	int16_t _texture_offset, i;
-
-	if( _current_map->bg_texture != -1 )
-		set_tile( _draw_x, _draw_y, map_bg_texture_offset, 0, 0, 16 );
-
-	/* Make sure there's a texture to draw */
-	if( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) {
-
-		/* Calculate the texture offset */
-		_texture_offset = 0;
-		for( i = 0; i < (*map_tiles_ptr).texture; i++ ) {
-			_texture_offset += _texture_lengths[i];
-		}
-		_texture_offset += (*map_tiles_ptr).texture_offset;
-
-		if( (*map_tiles_ptr).top_layer ) {
-
-			/* Top Layer texture, draw to the top layer map */
-			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 18 );
-		} else {
-
-			/* Bottom Layer texture, draw to the normal map */
-			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
-		}
-	} else {
-
-		/* If not, draw a transparent tile to ensure we're not showing old tiles in the buffer */
-		set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
-	}
-}
-
-/* Max map size before we need to add scrolling functionality: width = 18, height = 22 */
-void draw_map_init( void ) {
-
-	/* Clears the display display buffer and draws the map */
-	int16_t _draw_x, _draw_y, i;
-
-	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
-	toncset16( &se_mem[16][0], 1, 2048 );
-
-	/* Set transparent background for foreground map at screenblock 17 (memory address 0x0600:8800) */
-	toncset16( &se_mem[17][0], 0, 2048 );
-
-	/* Set transparent background for top layer at screenblock 18 (memory address 0x0600:9000) */
-	toncset16( &se_mem[18][0], 0, 2048 );
-
-	/* Calculate gaps around displayed map */
-	calculate_map_offsets();
-
-	/* Calculate the background texture offset */
-	map_bg_texture_offset = 0;
-	if( _current_map->bg_texture != -1 ) {
-
-		for( i = 0; i < _current_map->bg_texture; i++ ) {
-			map_bg_texture_offset += _texture_lengths[i];
-		}
-		map_bg_texture_offset += _current_map->bg_texture_offset;
-	}
-
-	/* Get the current map tile pointer, starting at (0, 0) */
-	const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
-
-	/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
-	if( _screen_offsets.w == 0 )
-		map_tiles_ptr += ( map_pos.x - 14 );
-
-	/* Move the map pointer to first row to draw, if there's a gap around the edges, we don't need to move anything */
-	if( _screen_offsets.n == 0 )
-		map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
-
-	/* Loop through each of the 20 rows of the display (y-direction) */
-	for( _draw_y = 0; _draw_y < 20; _draw_y++ ) {
-		
-		/* Ignore tiles outside of the map limits */
-		if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
-			
-			/* Loop through each of the 30 columns (x-direction) */
-			for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
-
-				/* Again, ignore tiles outside of the map limits */
-				if( ( _draw_x >= _screen_offsets.w ) && ( ( map_pos.x + _draw_x - 13 ) <= _current_map->map_width ) ) {
-
-					/* Draw map tile */
-					draw_map_tile( _draw_x, _draw_y, map_tiles_ptr );
-
-					/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
-					if( _draw_x != 29 ) map_tiles_ptr++;
-				}
-			}
-
-			/* Increment the pointer as we move to the next row on the dislay, but if we're drawing the last row, then don't move the pointer either */
-			if( ( _screen_offsets.e == 0 ) || ( _screen_offsets.w == 0 ) ) {
-
-				/* If we're drawing the last row then don't move the pointer either */
-				if( _draw_y != 19 ) 
-					map_tiles_ptr += ( _current_map->map_width - 29 + _screen_offsets.w + ( ( _screen_offsets.e > 1 ) ? ( _screen_offsets.e - 1 ) : 0 ) );
-			}
-		}
-	}
-}
-
-void set_player_sprite( uint8_t offset, bool flip_h ) {
-
-	/* Update the offset of the player sprite */
-	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( offset * 8 ) | ATTR2_PRIO( 1 ) ) );
-	obj_set_pos( player_sprite, 112, 72 );
-}
-
 void init( void ) {
+	
 	/*********************************************************************************
 		Copy data to VRAM
 	*********************************************************************************/
@@ -264,9 +100,7 @@ void init( void ) {
 	/*********************************************************************************
 		Initialisation
 	*********************************************************************************/
-	/* Initialise our variables */
 	_keys_current = 0;
-	scroll_pos = (struct dir_vec) { 0, 0 }; 
 
 	/* Initialise our sprites */
 	oam_init( obj_buffer, 128 );
@@ -307,19 +141,6 @@ void init( void ) {
 	/* Configure BG3 using charblock 0 and screenblock 19 - menu/dialog/debug overlay */
 	REG_BG3CNT = BG_CBB(0) | BG_SBB(19) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
-	/* Set BG0 position */
-	REG_BG0HOFS = 0;
-	REG_BG0VOFS = 0;
-	/* Set BG1 position */
-	REG_BG1HOFS = 0;
-	REG_BG1VOFS = 0;
-	/* Set BG2 position */
-	REG_BG2HOFS = 0;
-	REG_BG2VOFS = 0;
-	/* Set BG3 position */
-	REG_BG3HOFS = 0;
-	REG_BG3VOFS = 0;
-
 	/* Set bitmap mode to 0 and show all backgrounds and show sprites */
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
@@ -327,7 +148,7 @@ void init( void ) {
 	map_pos = (struct dir_vec) { 10, 16 };
 	_current_map = &map_list[2];
 
-	draw_map_init();
+	draw_map_init( true );
 
 	/* Enable the timer */
 	REG_TM0CNT = TM_FREQ_1 | TM_IRQ | TM_ENABLE;
@@ -340,10 +161,11 @@ void init( void ) {
 	animation.running = false;
 }
 
-int main( void )
-{
+int main( void ) {
+
 	int16_t _draw_x, _draw_y;
 
+	/* Initialise GBA */
 	init();
 
 	/*********************************************************************************
@@ -360,28 +182,13 @@ int main( void )
 		/* Development - Refresh display when B is pressed */
 		if( key_down( KEY_B ) ) {
 
-			draw_map_init();
-
-			/* Re-initialise variables */
-			scroll_pos = (struct dir_vec){ 0, 0 }; 
-
-			/* Set BG0 position */
-			REG_BG0HOFS = 0;
-			REG_BG0VOFS = 0;
-			/* Set BG1 position */
-			REG_BG1HOFS = 0;
-			REG_BG1VOFS = 0;
-			/* Set BG2 position */
-			REG_BG2HOFS = 0;
-			REG_BG2VOFS = 0;
-			/* Set BG3 position */
-			REG_BG3HOFS = 0;
-			REG_BG3VOFS = 0;
+			draw_map_init( true );
 		}
 
 		/* Development - Fade display out when A is pressed */
 		if( key_down( KEY_A ) ) {
 
+			exit_map.waiting_load = true;
 			start_animation( fade_screen, 2, 0, true );
 		}
 
@@ -737,8 +544,38 @@ int main( void )
 					animation.animation_ptr();
 
 					/* Check if animation has finished */
-					if( animation.finished ) 
-						reset_animation();
+					if( animation.finished ) {
+
+						/* Is it time to load up the new map or show the one we've loaded */
+						if( exit_map.waiting_load ) {
+
+							/* Move the player to the correct position */
+							//map_pos = { exit_map.exit_map_pos.x, exit_map.exit_map_pos.y };
+							map_pos = (struct dir_vec) { 0, 0 };
+							/* Set the new map */
+							//_current_map = &map_list[ exit_map.exit_map_id ];
+							_current_map = &map_list[ 0 ];
+
+							/* Render new map whilst the screen is black */
+							draw_map_init( true );
+
+							/* Set map as loaded but not shown */
+							exit_map.waiting_load = false;
+							exit_map.waiting_show = true;
+
+							/* and trigger the fade in animation */
+							start_animation( fade_screen, 2, 0, false );
+
+						} else if ( exit_map.waiting_show ) {
+
+							/* Time to show the newly loaded map */
+							reset_animation();
+
+							/* Make sure we don't get stuck in the doorway */
+							exit_map.waiting_show = false;
+							exit_map.exit_map_pos = (struct dir_vec) { 0, 0 };
+						}
+					}
 				}
 			}
 		}
@@ -824,5 +661,192 @@ int main( void )
 		/* Wait for video sync */
 		vid_vsync();
 	}
-
 }
+
+void debugging( void ) {
+
+	#if d_player_movement
+		sprintf( write_text, " P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_key_info
+		sprintf( write_text, " K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_tick_info
+		sprintf( write_text, " D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)game_tick );
+		write_string( write_text, 0, 2, 0 );
+	#endif
+
+	#if d_animation_info
+		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
+		write_string( write_text, 0, 0, 0 );
+	#endif
+
+	#if d_map_rendering_offsets
+		sprintf( write_text, " P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+	
+	#if d_map_coordinates
+		uint8_t i;
+		for( i = 0; i < 10; i++ ) {
+			write_character( ( 48 + i ), 0, i );
+			write_character( ( 48 + i ), 0, ( i + 10 ) );
+		}
+		sprintf( write_text, "012345678901234567890123456789" );
+		write_string( write_text, 0, 19, 0 );
+	#endif
+}
+
+void calculate_map_offsets( void ) {
+
+	/* Calculate how many empty tiles we need to display around the map shown on screen */
+	_screen_offsets = (struct offset_vec){ 0, 0, 0, 0 };
+
+	if( map_pos.y < 9 )
+		_screen_offsets.n = ( 9 - map_pos.y );
+
+	if( ( map_pos.x + 16 ) > _current_map->map_width )
+		_screen_offsets.e = ( map_pos.x + 16 - _current_map->map_width );
+
+	if( ( map_pos.y + 12 ) > _current_map->map_height )
+		_screen_offsets.s = ( map_pos.y + 11 - _current_map->map_height );
+
+	if( map_pos.x < 14 )
+		_screen_offsets.w = ( 14 - map_pos.x );
+}
+
+void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) ) {
+
+	int16_t _texture_offset, i;
+
+	/* Check if we have a background texture to draw, and if so add it to the background layer */
+	if( _current_map->bg_texture != -1 )
+		set_tile( _draw_x, _draw_y, map_bg_texture_offset, 0, 0, 16 );
+
+	/* Make sure there's a texture to draw */
+	if( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) {
+
+		/* Calculate the texture offset */
+		_texture_offset = 0;
+		for( i = 0; i < (*map_tiles_ptr).texture; i++ ) {
+			_texture_offset += _texture_lengths[i];
+		}
+		_texture_offset += (*map_tiles_ptr).texture_offset;
+
+		if( (*map_tiles_ptr).top_layer ) {
+
+			/* Top Layer texture, draw to the top layer map */
+			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 18 );
+		} else {
+
+			/* Bottom Layer texture, draw to the normal map */
+			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
+		}
+	} else {
+
+		/* If not, draw a transparent tile to ensure we're not showing old tiles in the buffer */
+		set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+	}
+}
+
+void draw_map_init( bool reset_scroll ) {
+
+	/* Clears the display display buffer and draws the map */
+	int16_t _draw_x, _draw_y, i;
+
+	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
+	toncset16( &se_mem[16][0], 1, 2048 );
+
+	/* Set transparent background for foreground map at screenblock 17 (memory address 0x0600:8800) */
+	toncset16( &se_mem[17][0], 0, 2048 );
+
+	/* Set transparent background for top layer at screenblock 18 (memory address 0x0600:9000) */
+	toncset16( &se_mem[18][0], 0, 2048 );
+
+	/* Calculate gaps around displayed map */
+	calculate_map_offsets();
+
+	/* Calculate the background texture offset */
+	map_bg_texture_offset = 0;
+	if( _current_map->bg_texture != -1 ) {
+
+		for( i = 0; i < _current_map->bg_texture; i++ ) {
+			map_bg_texture_offset += _texture_lengths[i];
+		}
+		map_bg_texture_offset += _current_map->bg_texture_offset;
+	}
+
+	/* Get the current map tile pointer, starting at (0, 0) */
+	const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
+
+	/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
+	if( _screen_offsets.w == 0 )
+		map_tiles_ptr += ( map_pos.x - 14 );
+
+	/* Move the map pointer to first row to draw, if there's a gap around the edges, we don't need to move anything */
+	if( _screen_offsets.n == 0 )
+		map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
+
+	/* Loop through each of the 20 rows of the display (y-direction) */
+	for( _draw_y = 0; _draw_y < 20; _draw_y++ ) {
+		
+		/* Ignore tiles outside of the map limits */
+		if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
+			
+			/* Loop through each of the 30 columns (x-direction) */
+			for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+
+				/* Again, ignore tiles outside of the map limits */
+				if( ( _draw_x >= _screen_offsets.w ) && ( ( map_pos.x + _draw_x - 13 ) <= _current_map->map_width ) ) {
+
+					/* Draw map tile */
+					draw_map_tile( _draw_x, _draw_y, map_tiles_ptr );
+
+					/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
+					if( _draw_x != 29 ) map_tiles_ptr++;
+				}
+			}
+
+			/* Increment the pointer as we move to the next row on the dislay, but if we're drawing the last row, then don't move the pointer either */
+			if( ( _screen_offsets.e == 0 ) || ( _screen_offsets.w == 0 ) ) {
+
+				/* If we're drawing the last row then don't move the pointer either */
+				if( _draw_y != 19 ) 
+					map_tiles_ptr += ( _current_map->map_width - 29 + _screen_offsets.w + ( ( _screen_offsets.e > 1 ) ? ( _screen_offsets.e - 1 ) : 0 ) );
+			}
+		}
+	}
+
+	/* Do we need to reset the scroll */
+	if( reset_scroll ) {
+		
+		/* Reset the scroll position variable */
+		scroll_pos = (struct dir_vec){ 0, 0 }; 
+
+		/* Set BG0 position */
+		REG_BG0HOFS = 0;
+		REG_BG0VOFS = 0;
+		/* Set BG1 position */
+		REG_BG1HOFS = 0;
+		REG_BG1VOFS = 0;
+		/* Set BG2 position */
+		REG_BG2HOFS = 0;
+		REG_BG2VOFS = 0;
+		/* Set BG3 position */
+		REG_BG3HOFS = 0;
+		REG_BG3VOFS = 0;
+	}
+}
+
+void set_player_sprite( uint8_t offset, bool flip_h ) {
+
+	/* Update the offset of the player sprite */
+	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( offset * 8 ) | ATTR2_PRIO( 1 ) ) );
+	obj_set_pos( player_sprite, 112, 72 );
+}
+
+

@@ -26,8 +26,8 @@ typedef void (*fnptr)(void);
 #define d_player_movement                 false	// Displays player position
 #define d_player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
 #define d_interaction_info                false	// Displays information about interaction tiles
-#define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
-#define d_animation_info                  true	// Displays information about the running animation
+#define d_exit_map_info                   true	// Displays information about the map to load if exiting current map
+#define d_animation_info                  false	// Displays information about the running animation
 #define d_textbox_info                    false	// Displays information about the current textbox
 #define d_npc_info                        false	// Displays information about the NPC
 #define d_key_info                        false	// Displays information about the keys being pressed
@@ -450,7 +450,13 @@ static inline int g_mod( int k, int n ) {
 	main.c Function Prototypes
 *********************************************************************************/
 void debugging( void );
-void update_map( void );
+
+void calculate_map_offsets( void );
+void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) );
+void draw_map_init( bool reset_scroll );
+void set_player_sprite( uint8_t offset, bool flip_h );
+
+void init( void );
 
 extern void fade_screen( void );
 
