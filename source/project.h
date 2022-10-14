@@ -399,6 +399,14 @@ struct map {
 	int16_t bg_texture_offset;
 };
 
+struct exit_map_info {
+	bool waiting_load;
+	bool waiting_show;
+	uint16_t exit_map_id;
+	struct dir_vec exit_map_pos;
+} ;
+
+/* Game ticks */
 struct game_ticks {
 	uint32_t game;
 	uint8_t animation;

@@ -10,18 +10,18 @@
 /*********************************************************************************
 	Debugging Definitions
 *********************************************************************************/
-#define map_coordinates                 false	// Displays the coordinates of the display
-#define map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
-#define map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
-#define player_movement                 false	// Displays player position
-#define player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
-#define interaction_info                false	// Displays information about interaction tiles
-#define exit_map_info                   false	// Displays information about the map to load if exiting current map
-#define animation_info                  true	// Displays information about the running animation
-#define textbox_info                    false	// Displays information about the current textbox
-#define npc_info                        false	// Displays information about the NPC
-#define key_info                        false	// Displays information about the keys being pressed
-#define tick_info                       false	// Displays various timer ticks
+#define d_map_coordinates                 false	// Displays the coordinates of the display
+#define d_map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
+#define d_map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
+#define d_player_movement                 false	// Displays player position
+#define d_player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
+#define d_interaction_info                false	// Displays information about interaction tiles
+#define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
+#define d_animation_info                  true	// Displays information about the running animation
+#define d_textbox_info                    false	// Displays information about the current textbox
+#define d_npc_info                        false	// Displays information about the NPC
+#define d_key_info                        false	// Displays information about the keys being pressed
+#define d_tick_info                       false	// Displays various timer ticks
 
 /*********************************************************************************
 	Helpful Functions
@@ -51,6 +51,7 @@ struct game_ticks ticks;
 /* Map */
 struct map *_current_map;
 int16_t map_bg_texture_offset;
+struct exit_map_info exit_map;
 
 /* Player */
 struct player_struct player;
@@ -105,32 +106,32 @@ const fnptr master_isrs[2] = {
 *********************************************************************************/
 void debugging( void ) {
 
-	#if player_movement
+	#if d_player_movement
 		sprintf( write_text, " P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
 		write_string( write_text, 0, 0, 0 );
 	#endif
 
-	#if key_info
+	#if d_key_info
 		sprintf( write_text, " K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
 		write_string( write_text, 0, 1, 0 );
 	#endif
 
-	#if tick_info
+	#if d_tick_info
 		sprintf( write_text, " D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)game_tick );
 		write_string( write_text, 0, 2, 0 );
 	#endif
 
-	#if animation_info
+	#if d_animation_info
 		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
 		write_string( write_text, 0, 0, 0 );
 	#endif
 
-	#if map_rendering_offsets
+	#if d_map_rendering_offsets
 		sprintf( write_text, " P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
 		write_string( write_text, 0, 1, 0 );
 	#endif
 	
-	#if map_coordinates
+	#if d_map_coordinates
 		uint8_t i;
 		for( i = 0; i < 10; i++ ) {
 			write_character( ( 48 + i ), 0, i );
@@ -381,6 +382,11 @@ void init( void ) {
 	upcoming_map_pos.x = 0;
 	upcoming_map_pos.y = 0;
 
+	exit_map.waiting_load = false;
+	exit_map.waiting_show = false;
+	exit_map.exit_map_id = 0;
+	exit_map.exit_map_pos = (struct dir_vec) {0, 0};
+
 	/* Initialise timer and ticks */
 	ticks = (struct game_ticks) { 0, 0, 0 };
 
@@ -476,6 +482,8 @@ int main( void )
 			animation.tick = 0;
 			animation.occurance = 2;
 			animation.repeat = 0;
+
+
 		}
 
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
