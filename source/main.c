@@ -1,5 +1,6 @@
 #include "project.h"
 
+#include "include/animations.h"
 #include "include/keys.h"
 #include "include/sprites.h"
 #include "include/text.h"
@@ -8,78 +9,44 @@
 #include "assets/demo_project.h"
 
 /*********************************************************************************
-	Debugging Definitions
-*********************************************************************************/
-#define d_map_coordinates                 false	// Displays the coordinates of the display
-#define d_map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
-#define d_map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
-#define d_player_movement                 false	// Displays player position
-#define d_player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
-#define d_interaction_info                false	// Displays information about interaction tiles
-#define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
-#define d_animation_info                  true	// Displays information about the running animation
-#define d_textbox_info                    false	// Displays information about the current textbox
-#define d_npc_info                        false	// Displays information about the NPC
-#define d_key_info                        false	// Displays information about the keys being pressed
-#define d_tick_info                       false	// Displays various timer ticks
-
-/*********************************************************************************
-	Helpful Functions
-*********************************************************************************/
-/* Sets a tile value from screenblock at x, y */
-static inline void set_tile( uint16_t x, uint16_t y, uint16_t tile, bool h_flip, bool v_flip, uint8_t screenblock ) {
-	se_mem[ screenblock ][ x + ( y * 32 ) ] = tile | ( h_flip ? SE_HFLIP : 0 ) | ( v_flip ? SE_VFLIP : 0 );
-}
-
-/* Converts 32-bit RGB to 15-bit BGR */
-static inline uint16_t rgb(uint32_t colour) {
-	return 0x0 | ( ( ( ( ( colour >> 16 ) & 0xFF) / 8 ) << 0 ) | ( ( ( ( colour >> 8 ) & 0xFF) / 8 ) << 5 ) | ( ( ( colour & 0xFF) / 8 ) << 10 ) );
-}
-
-static inline int g_mod( int k, int n ) {
-	return( ( k %= n ) < 0 ) ? k + n : k;
-}
-
-/*********************************************************************************
 	Global Variables
 *********************************************************************************/
-uint16_t __key_curr;
+uint16_t _keys_current;
 
 /* Game ticks */
-struct game_ticks ticks;
+struct game_ticks                       ticks;
 
 /* Map */
-struct map *_current_map;
 int16_t map_bg_texture_offset;
-struct exit_map_info exit_map;
+struct map                              *_current_map;
+struct exit_map_info                    exit_map;
 
 /* Player */
-struct player_struct player;
+struct player_struct                    player;
 
 /* Player movement variables */
-OBJ_ATTR *player_sprite;
-struct dir_vec map_pos; /* Map Position is defined as the position of the top left tile of the player */
-struct dir_vec scroll_pos;
-struct offset_vec _screen_offsets;
+OBJ_ATTR                                *player_sprite;
+struct dir_vec                          map_pos; /* Map Position is defined as the position of the top left tile of the player */
+struct dir_vec                          scroll_pos;
+struct offset_vec                       _screen_offsets;
+uint8_t player_animation_tick, player_movement_delay;
 //struct dir_en allowed_movement, exit_tile, interaction_tile;
 //int16_t interaction_tile_id[4];
-uint8_t player_animation_tick, player_movement_delay;
 
 /* Animation */
-struct animation_settings animation;
+struct animation_settings               animation;
 
 #define move_multiplier                 2 // Defines how many spaces to move at a time
 #define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
 
 /* Movement scrolling animation */
+struct dir_vec                          upcoming_map_pos;
 bool scroll_movement;
 uint16_t scroll_counter, move_tile_counter;
-struct dir_vec upcoming_map_pos;
 int8_t _scroll_x, _scroll_y;
 
-char write_text[128];
-OBJ_ATTR obj_buffer[128];
-
+char write_text[ 128 ];
+OBJ_ATTR obj_buffer[ 128 ];
 
 /*********************************************************************************
 	Timer Variables
@@ -269,65 +236,6 @@ void set_player_sprite( uint8_t offset, bool flip_h ) {
 	obj_set_pos( player_sprite, 112, 72 );
 }
 
-void fade_screen( void ) {
-
-	uint16_t i;
-	uint8_t step;
-	uint8_t hexRed, hexGreen, hexBlue;
-	uint8_t hexDRed, hexDGreen, hexDBlue;
-
-	/* Get the current step */
-	if( animation.reverse ) step = animation.step;
-	else step = ( 0x7 ^ animation.step ) - 2;
-
-	if( ( animation.step >= 0 ) && ( animation.step <= 5 ) ) {
-		
-		for( i = 0; i < sizeof( _texture_colour_palette ); i++ ) {
-
-			hexRed = ( ( ( _texture_colour_palette[ i ] ) & 0x1F) * 8 );
-			hexGreen = ( ( ( _texture_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
-			hexBlue = ( ( ( _texture_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
-
-			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
-			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
-			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
-
-			pal_bg_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue ) );
-		}
-
-		for( i = 0; i < sizeof( _sprite_colour_palette ); i++ ) {
-
-			hexRed = ( ( ( _sprite_colour_palette[ i ] ) & 0x1F) * 8 );
-			hexGreen = ( ( ( _sprite_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
-			hexBlue = ( ( ( _sprite_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
-
-			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
-			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
-			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
-
-			pal_obj_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue ) );
-		}
-			
-		/* Advance the animation, unless it's finished */
-		if( animation.step == 5 ) {
-
-			if( animation.repeat > 0 ) {
-				animation.repeat--;
-
-				animation.reverse = !animation.reverse;
-				animation.step = 0;
-				animation.tick = 0;
-			} else {
-				animation.finished = true;
-			}
-
-
-		} else {
-			animation.step++;
-		}
-	}
-}
-
 void init( void ) {
 	/*********************************************************************************
 		Copy data to VRAM
@@ -357,7 +265,7 @@ void init( void ) {
 		Initialisation
 	*********************************************************************************/
 	/* Initialise our variables */
-	__key_curr = 0;
+	_keys_current = 0;
 	scroll_pos = (struct dir_vec) { 0, 0 }; 
 
 	/* Initialise our sprites */
@@ -474,16 +382,7 @@ int main( void )
 		/* Development - Fade display out when A is pressed */
 		if( key_down( KEY_A ) ) {
 
-			animation.running = true;
-			animation.finished = false;
-			animation.reverse = true;
-			animation.animation_ptr = fade_screen;
-			animation.step = 0;
-			animation.tick = 0;
-			animation.occurance = 2;
-			animation.repeat = 0;
-
-
+			start_animation( fade_screen, 2, 0, true );
 		}
 
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
@@ -839,7 +738,7 @@ int main( void )
 
 					/* Check if animation has finished */
 					if( animation.finished ) 
-						animation.running = false;
+						reset_animation();
 				}
 			}
 		}

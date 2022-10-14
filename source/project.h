@@ -18,6 +18,22 @@ typedef void (*fnptr)(void);
 #include "tonc/tonc_irq.h"
 
 /*********************************************************************************
+	Debugging Definitions
+*********************************************************************************/
+#define d_map_coordinates                 false	// Displays the coordinates of the display
+#define d_map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
+#define d_map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
+#define d_player_movement                 false	// Displays player position
+#define d_player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
+#define d_interaction_info                false	// Displays information about interaction tiles
+#define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
+#define d_animation_info                  true	// Displays information about the running animation
+#define d_textbox_info                    false	// Displays information about the current textbox
+#define d_npc_info                        false	// Displays information about the NPC
+#define d_key_info                        false	// Displays information about the keys being pressed
+#define d_tick_info                       false	// Displays various timer ticks
+
+/*********************************************************************************
 	Register Definitions
 *********************************************************************************/
 #define MEM_IO				0x04000000
@@ -414,9 +430,28 @@ struct game_ticks {
 };
 
 /*********************************************************************************
+	Helpful Functions
+*********************************************************************************/
+/* Sets a tile value from screenblock at x, y */
+static inline void set_tile( uint16_t x, uint16_t y, uint16_t tile, bool h_flip, bool v_flip, uint8_t screenblock ) {
+	se_mem[ screenblock ][ x + ( y * 32 ) ] = tile | ( h_flip ? SE_HFLIP : 0 ) | ( v_flip ? SE_VFLIP : 0 );
+}
+
+/* Converts 32-bit RGB to 15-bit BGR */
+static inline uint16_t rgb(uint32_t colour) {
+	return 0x0 | ( ( ( ( ( colour >> 16 ) & 0xFF) / 8 ) << 0 ) | ( ( ( ( colour >> 8 ) & 0xFF) / 8 ) << 5 ) | ( ( ( colour & 0xFF) / 8 ) << 10 ) );
+}
+
+static inline int g_mod( int k, int n ) {
+	return( ( k %= n ) < 0 ) ? k + n : k;
+}
+
+/*********************************************************************************
 	main.c Function Prototypes
 *********************************************************************************/
 void debugging( void );
 void update_map( void );
+
+extern void fade_screen( void );
 
 #endif

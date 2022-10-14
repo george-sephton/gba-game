@@ -5,11 +5,11 @@
 
 typedef struct OBJ_ATTR
 {
-	u16 attr0;
-	u16 attr1;
-	u16 attr2;
-	s16 fill;
-} __attribute__((aligned(4))) OBJ_ATTR;
+	uint16_t attr0;
+	uint16_t attr1;
+	uint16_t attr2;
+	int16_t fill;
+} __attribute__( ( aligned( 4 ) ) ) OBJ_ATTR;
 
 void oam_init(OBJ_ATTR *obj, u32 count);
 void oam_copy(OBJ_ATTR *dst, const OBJ_ATTR *src, u32 count);

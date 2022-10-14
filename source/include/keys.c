@@ -2,5 +2,5 @@
 
 void key_poll( void )
 {
-	__key_curr= ~REG_KEYINPUT & KEY_MASK;
+	_keys_current = ~REG_KEYINPUT & KEY_MASK;
 }

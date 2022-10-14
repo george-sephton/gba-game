@@ -226,6 +226,7 @@ const uint16_t _sprite_map[ 1696 ] = {
 /*********************************************************************************
 	Sprite Colour Palette
 *********************************************************************************/
+const uint16_t _sprite_colour_palette_length = 22;
 const uint16_t _sprite_colour_palette[ 22 ] = {
 	0x7c1f, 0x0000, 0xFFFF, 0x0800, 0x4504, 0x573f, 0x18ce, 0x323b,
 	0x3afd, 0x3a3d, 0x666e, 0x4d46, 0x18c6, 0x2151, 0x399b, 0x109d,
@@ -1010,6 +1011,7 @@ const uint16_t _texture_lengths[16] = {
 /*********************************************************************************
 	Texture Colour Palette
 *********************************************************************************/
+const uint16_t _texture_colour_palette_length = 80;
 const uint16_t _texture_colour_palette[ 80 ] = {
 	0x7c1f, 0x0000, 0xFFFF, 0x001F, 0x2b7d, 0x1a7f, 0x399b, 0x109d,
 	0x12fb, 0x0a77, 0x6f31, 0x6ee8, 0x55cc, 0x66b1, 0x09b0, 0x7ff9,
