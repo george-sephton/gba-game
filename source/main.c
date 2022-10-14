@@ -87,13 +87,11 @@ uint32_t game_tick;
 __attribute__((section(".iwram"), long_call)) void isr_master();
 __attribute__((section(".iwram"), long_call)) void timr0_callback();
 
-void timr0_callback()
-{
+void timr0_callback( void ) {
 	timer_count++;
 }
 
-const fnptr master_isrs[2]= 
-{
+const fnptr master_isrs[2] = {
 	(fnptr)isr_master,
 	(fnptr)timr0_callback 
 };
@@ -119,7 +117,7 @@ void debugging( void ) {
 	#endif
 
 	#if animation_info
-		sprintf( write_text,"R(%d,%d)F(%d)S(%d)T(%d,%d)", animation.running, animation.reverse, animation.finished, animation.step, animation.tick % animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
+		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
 		write_string( write_text, 0, 0, 0 );
 	#endif
 
@@ -275,7 +273,7 @@ void fade_screen( void ) {
 
 	/* Get the current step */
 	if( animation.reverse ) step = animation.step;
-	else step = (0x7 ^ animation.step) - 4;
+	else step = ( 0x7 ^ animation.step ) - 2;
 
 	if( ( animation.step >= 0 ) && ( animation.step <= 5 ) ) {
 		
@@ -292,31 +290,53 @@ void fade_screen( void ) {
 			pal_bg_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue << 0 ) );
 		}
 
-		if( !( animation.tick % animation.occurance ) ) {
+		for( i = 0; i < sizeof( _sprite_colour_palette ); i++ ) {
+
+			hexRed = ((( _sprite_colour_palette[ i ] >> 0 ) & 0x1F) * 8 );
+			hexGreen = ((( _sprite_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
+			hexBlue = ((( _sprite_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
+
+			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
+			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
+			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
+
+			pal_obj_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue << 0 ) );
+		}
 			
-			/* Advance the animation, unless it's finished */
-			if( animation.step == 5 ) animation.finished = true;
-			else animation.step++;
+		/* Advance the animation, unless it's finished */
+		if( animation.step == 5 ) {
+
+			animation.repeat--;
+			if( animation.repeat > 0 ) {
+				animation.reverse = !animation.reverse;
+				animation.step = 0;
+				animation.tick = 0;
+			} else {
+				animation.finished = true;
+			}
+
+
+		} else {
+			animation.step++;
 		}
 	}
 }
 
-int main()
-{
+void init( void ) {
 	/*********************************************************************************
 		Copy data to VRAM
 	*********************************************************************************/
 	/* Load texture colour palette */
 	memcpy( pal_bg_mem, _texture_colour_palette, sizeof( _texture_colour_palette ) );
 	/* Load sprite colour palette */
-    memcpy( pal_obj_mem, _sprite_colour_palette, sizeof( _sprite_colour_palette ) );
+	memcpy( pal_obj_mem, _sprite_colour_palette, sizeof( _sprite_colour_palette ) );
 
 	/* Load font into VRAM charblock 0 (memory address 0x0600:0000) */
 	memcpy( &tile_mem[0][0], _font_map, sizeof( _font_map ) );
 	/* Load tileset into VRAM charblock 1 (memory address 0x0600:4000) */
 	memcpy( &tile_mem[1][0], _texture_map, sizeof( _texture_map ) );
 	/* Load sprites into VRAM charblock 4 (memory address 0x0601:0000) */
-    memcpy( &tile_mem[4][0], _sprite_map, sizeof( _sprite_map ) );
+	memcpy( &tile_mem[4][0], _sprite_map, sizeof( _sprite_map ) );
 
 	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
 	toncset16( &se_mem[16][0], 0, 2048 );
@@ -399,6 +419,11 @@ int main()
 
 	/* Initialise animation variables - none in progress */
 	animation.running = false;
+}
+
+int main( void )
+{
+	init();
 
 	/*********************************************************************************
 		Game Loop
@@ -441,8 +466,9 @@ int main()
 			animation.reverse = true;
 			animation.animation_ptr = fade_screen;
 			animation.step = 0;
-			animation.tick = 1; // Set to 1 to avoid triggering straight away - I might change this later
-			animation.occurance = 3;
+			animation.tick = 0;
+			animation.occurance = 2;
+			animation.repeat = 1;
 		}
 
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
@@ -608,14 +634,27 @@ int main()
 			}
 		}
 
-		/* Advance the animation, if running and not finished */
-		if( ( animation.running ) && ( !animation.finished ) ) 
-			animation.tick++;
-
 		/* Deal with timer, allows us to do animations etc a bit more precisely and not too fast */
 		if( timer_count >= 5 ) {
 			
 			timer_count = 0;
+
+			/* Advance the animation, if running and not finished */
+			if( ( animation.running ) && ( !animation.finished ) ) {
+				animation.tick++;
+
+				if( animation.tick >= animation.occurance ) {
+
+					animation.tick = 0;
+
+					/* Call animation function */
+					animation.animation_ptr();
+
+					/* Check if animation has finished */
+					if( animation.finished ) 
+						animation.running = false;
+				}
+			}
 
 			/* Game Tick */
 			game_tick++;
@@ -674,19 +713,6 @@ int main()
 							player.walk_dir.y = 0;
 						}
 					}
-				}
-			}
-
-			/* An animation is running */
-			if( animation.running ) {
-				
-				/* Call animation function */
-				animation.animation_ptr();
-
-				/* Check if animation has finished */
-				if( animation.finished ) {
-					
-					animation.running = false;
 				}
 			}
 

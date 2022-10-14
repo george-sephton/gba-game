@@ -357,13 +357,14 @@ struct player_struct {
 /* Animation structures */
 typedef void ( *animation_function )( void );
 
-struct animation_settings{
+struct animation_settings {
 	bool running;
 	bool finished;
 	bool reverse;
 	uint8_t tick;
 	uint8_t occurance;
 	uint8_t step;
+	uint8_t repeat;
 	animation_function animation_ptr;
 };
 
