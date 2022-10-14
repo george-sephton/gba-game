@@ -399,6 +399,12 @@ struct map {
 	int16_t bg_texture_offset;
 };
 
+struct game_ticks {
+	uint32_t game;
+	uint8_t animation;
+	uint8_t player;
+};
+
 /*********************************************************************************
 	main.c Function Prototypes
 *********************************************************************************/

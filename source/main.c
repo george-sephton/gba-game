@@ -45,6 +45,9 @@ static inline int g_mod( int k, int n ) {
 *********************************************************************************/
 uint16_t __key_curr;
 
+/* Game ticks */
+struct game_ticks ticks;
+
 /* Map */
 struct map *_current_map;
 int16_t map_bg_texture_offset;
@@ -80,15 +83,16 @@ OBJ_ATTR obj_buffer[128];
 /*********************************************************************************
 	Timer Variables
 *********************************************************************************/
-uint16_t timer_count;
-uint32_t game_tick;
-
 /* Timer IRQ Prototypes */
 __attribute__((section(".iwram"), long_call)) void isr_master();
 __attribute__((section(".iwram"), long_call)) void timr0_callback();
 
 void timr0_callback( void ) {
-	timer_count++;
+	
+	/* Increment our ticks */
+	ticks.game++;
+	ticks.animation++;
+	ticks.player++;
 }
 
 const fnptr master_isrs[2] = {
@@ -266,7 +270,7 @@ void set_player_sprite( uint8_t offset, bool flip_h ) {
 
 void fade_screen( void ) {
 
-	uint16_t i, j;
+	uint16_t i;
 	uint8_t step;
 	uint8_t hexRed, hexGreen, hexBlue;
 	uint8_t hexDRed, hexDGreen, hexDBlue;
@@ -279,28 +283,28 @@ void fade_screen( void ) {
 		
 		for( i = 0; i < sizeof( _texture_colour_palette ); i++ ) {
 
-			hexRed = ((( _texture_colour_palette[ i ] >> 0 ) & 0x1F) * 8 );
-			hexGreen = ((( _texture_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
-			hexBlue = ((( _texture_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
+			hexRed = ( ( ( _texture_colour_palette[ i ] ) & 0x1F) * 8 );
+			hexGreen = ( ( ( _texture_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
+			hexBlue = ( ( ( _texture_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
 
 			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
 			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
 			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
 
-			pal_bg_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue << 0 ) );
+			pal_bg_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue ) );
 		}
 
 		for( i = 0; i < sizeof( _sprite_colour_palette ); i++ ) {
 
-			hexRed = ((( _sprite_colour_palette[ i ] >> 0 ) & 0x1F) * 8 );
-			hexGreen = ((( _sprite_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
-			hexBlue = ((( _sprite_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
+			hexRed = ( ( ( _sprite_colour_palette[ i ] ) & 0x1F) * 8 );
+			hexGreen = ( ( ( _sprite_colour_palette[ i ] >> 5 ) & 0x1F) * 8 );
+			hexBlue = ( ( ( _sprite_colour_palette[ i ] >> 10 ) & 0x1F) * 8 );
 
 			hexDRed = hexRed - ( hexRed * ( 20 * step ) ) / 100;
 			hexDGreen = hexGreen - ( hexGreen * ( 20 * step ) ) / 100;
 			hexDBlue = hexBlue - ( hexBlue * ( 20 * step ) ) / 100;
 
-			pal_obj_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue << 0 ) );
+			pal_obj_mem[ i ] = rgb( ( hexDRed << 16 ) | ( hexDGreen << 8 ) | ( hexDBlue ) );
 		}
 			
 		/* Advance the animation, unless it's finished */
@@ -352,7 +356,7 @@ void init( void ) {
 	*********************************************************************************/
 	/* Initialise our variables */
 	__key_curr = 0;
-	scroll_pos = (struct dir_vec){ 0, 0 }; 
+	scroll_pos = (struct dir_vec) { 0, 0 }; 
 
 	/* Initialise our sprites */
 	oam_init( obj_buffer, 128 );
@@ -370,14 +374,14 @@ void init( void ) {
 
 	player_animation_tick = 0;
 	player_movement_delay = 0;
-	bool scroll_movement = false;
+	scroll_movement = false;
 	scroll_counter = 0;
 	move_tile_counter = 0;
 	upcoming_map_pos.x = 0;
 	upcoming_map_pos.y = 0;
 
-	/* Initialise timer */
-	timer_count = 0;
+	/* Initialise timer and ticks */
+	ticks = (struct game_ticks) { 0, 0, 0 };
 
 	/* Configure BG0 using charblock 1 and screenblock 16 - background */
 	REG_BG0CNT = BG_CBB(1) | BG_SBB(16) | BG_8BPP | BG_REG_32x32 | BG_PRIO(3);
@@ -405,7 +409,7 @@ void init( void ) {
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec){ 10, 16 };
+	map_pos = (struct dir_vec) { 10, 16 };
 	_current_map = &map_list[2];
 
 	draw_map_init();
@@ -423,6 +427,8 @@ void init( void ) {
 
 int main( void )
 {
+	int16_t _draw_x, _draw_y;
+
 	init();
 
 	/*********************************************************************************
@@ -634,103 +640,6 @@ int main( void )
 			}
 		}
 
-		/* Deal with timer, allows us to do animations etc a bit more precisely and not too fast */
-		if( timer_count >= 5 ) {
-			
-			timer_count = 0;
-
-			/* Advance the animation, if running and not finished */
-			if( ( animation.running ) && ( !animation.finished ) ) {
-				animation.tick++;
-
-				if( animation.tick >= animation.occurance ) {
-
-					animation.tick = 0;
-
-					/* Call animation function */
-					animation.animation_ptr();
-
-					/* Check if animation has finished */
-					if( animation.finished ) 
-						animation.running = false;
-				}
-			}
-
-			/* Game Tick */
-			game_tick++;
-
-			/* Advance scrolling animation */
-			if( scroll_movement ) {
-			
-				/* If holding B, make the player run (move twice as fast), if the map allows running */
-				/*if( ( button( B ) ) && ( _current_map->running_en ) ) scroll_counter += 2;
-				else*/ scroll_counter++;
-
-				/* Scroll display */
-				_scroll_x = player.walk_dir.x * ( scroll_counter % 8 );
-				_scroll_y = -player.walk_dir.y * ( scroll_counter % 8 );
-
-				REG_BG0HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-				REG_BG0VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
-
-				REG_BG1HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-				REG_BG1VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
-
-				REG_BG2HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
-				REG_BG2VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
-
-				if( ( scroll_counter % 8 ) == 7 ) {
-
-					/* Count how many tiles we've moved so far */
-					move_tile_counter++;
-
-					/* Update the scroll as the tiles are updated 1 row/column at a time according to the scroll count */
-					scroll_pos.x += upcoming_map_pos.x;
-					scroll_pos.y += upcoming_map_pos.y;
-
-					/* Move the player to their new space */
-					map_pos.x += upcoming_map_pos.x;
-					map_pos.y += upcoming_map_pos.y;
-
-					if( move_tile_counter == move_multiplier ) {
-
-						/* Time to stop moving, reset the counters */
-						scroll_counter = 0;
-						move_tile_counter = 0;
-
-						/* If the player isn't holding down a button, let's stop moving */
-						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
-								( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_RIGHT ) ) ) ||
-								( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( !key_down( KEY_DOWN ) ) ) ||
-								( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_LEFT ) ) )
-							) {
-				
-							scroll_movement = false;
-							upcoming_map_pos.x = 0;
-							upcoming_map_pos.y = 0;
-
-							player.walk_dir.x = 0;
-							player.walk_dir.y = 0;
-						}
-					}
-				}
-			}
-
-			/* If the player is walking, let's make their little legs move or make them run if holding B */
-			if( ( !animation.running ) || ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
-
-				player_animation_tick++;
-
-				/* If holding B, make the player run, if the map allows running */
-				if( ( ( player_animation_tick >= 6 ) && ( ( ( !key_down( KEY_B ) ) && ( _current_map->running_en ) ) || ( !_current_map->running_en ) ) ) || ( ( player_animation_tick >= 3 ) && ( key_down( KEY_B ) ) && ( _current_map->running_en ) ) ) {
-					player_animation_tick = 0;
-					player.reverse_walking_render = !player.reverse_walking_render;
-				}
-			}
-		}
-
-		int16_t _draw_x, _draw_y;
-
 		/* Load in next row/column of tiles if we're moving */
 		if( ( upcoming_map_pos.x != 0 ) || ( upcoming_map_pos.y != 0 ) ) {
 
@@ -896,6 +805,107 @@ int main( void )
 
 					}
 
+				}
+			}
+		}
+
+		/*********************************************************************************
+			Ticks
+		*********************************************************************************/
+		/* Animation Tick */
+		if( ticks.animation >= 5 ) {
+			
+			ticks.animation = 0;
+
+			/* Advance the animation, if running and not finished */
+			if( ( animation.running ) && ( !animation.finished ) ) {
+				animation.tick++;
+
+				if( animation.tick >= animation.occurance ) {
+
+					animation.tick = 0;
+
+					/* Call animation function */
+					animation.animation_ptr();
+
+					/* Check if animation has finished */
+					if( animation.finished ) 
+						animation.running = false;
+				}
+			}
+		}
+
+		/* Scroll Tick */
+		if( ticks.player >= 5 ) {
+			
+			ticks.player = 0;
+
+			/* Advance scrolling animation */
+			if( scroll_movement ) {
+			
+				/* If holding B, make the player run (move twice as fast), if the map allows running */
+				/*if( ( button( B ) ) && ( _current_map->running_en ) ) scroll_counter += 2;
+				else*/ scroll_counter++;
+
+				/* Scroll display */
+				_scroll_x = player.walk_dir.x * ( scroll_counter % 8 );
+				_scroll_y = -player.walk_dir.y * ( scroll_counter % 8 );
+
+				REG_BG0HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG0VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				REG_BG1HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG1VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				REG_BG2HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
+				REG_BG2VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
+
+				if( ( scroll_counter % 8 ) == 7 ) {
+
+					/* Count how many tiles we've moved so far */
+					move_tile_counter++;
+
+					/* Update the scroll as the tiles are updated 1 row/column at a time according to the scroll count */
+					scroll_pos.x += upcoming_map_pos.x;
+					scroll_pos.y += upcoming_map_pos.y;
+
+					/* Move the player to their new space */
+					map_pos.x += upcoming_map_pos.x;
+					map_pos.y += upcoming_map_pos.y;
+
+					if( move_tile_counter == move_multiplier ) {
+
+						/* Time to stop moving, reset the counters */
+						scroll_counter = 0;
+						move_tile_counter = 0;
+
+						/* If the player isn't holding down a button, let's stop moving */
+						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
+								( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_RIGHT ) ) ) ||
+								( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( !key_down( KEY_DOWN ) ) ) ||
+								( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_LEFT ) ) )
+							) {
+				
+							scroll_movement = false;
+							upcoming_map_pos.x = 0;
+							upcoming_map_pos.y = 0;
+
+							player.walk_dir.x = 0;
+							player.walk_dir.y = 0;
+						}
+					}
+				}
+			}
+
+			/* If the player is walking, let's make their little legs move or make them run if holding B */
+			if( ( !animation.running ) || ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
+
+				player_animation_tick++;
+
+				/* If holding B, make the player run, if the map allows running */
+				if( ( ( player_animation_tick >= 6 ) && ( ( ( !key_down( KEY_B ) ) && ( _current_map->running_en ) ) || ( !_current_map->running_en ) ) ) || ( ( player_animation_tick >= 3 ) && ( key_down( KEY_B ) ) && ( _current_map->running_en ) ) ) {
+					player_animation_tick = 0;
+					player.reverse_walking_render = !player.reverse_walking_render;
 				}
 			}
 		}
