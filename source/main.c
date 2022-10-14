@@ -310,8 +310,9 @@ void fade_screen( void ) {
 		/* Advance the animation, unless it's finished */
 		if( animation.step == 5 ) {
 
-			animation.repeat--;
 			if( animation.repeat > 0 ) {
+				animation.repeat--;
+
 				animation.reverse = !animation.reverse;
 				animation.step = 0;
 				animation.tick = 0;
@@ -474,7 +475,7 @@ int main( void )
 			animation.step = 0;
 			animation.tick = 0;
 			animation.occurance = 2;
-			animation.repeat = 1;
+			animation.repeat = 0;
 		}
 
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
