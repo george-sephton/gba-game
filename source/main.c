@@ -36,7 +36,6 @@ int16_t                                 interaction_tile_id[4];
 /* Animation */
 struct animation_settings               animation;
 
-#define move_multiplier                 1 // Defines how many spaces to move at a time
 #define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
 
 /* Movement scrolling animation */
@@ -661,7 +660,7 @@ int main( void ) {
 					map_pos.x += upcoming_map_pos.x;
 					map_pos.y += upcoming_map_pos.y;
 
-					if( move_tile_counter == move_multiplier ) {
+					if( move_tile_counter == 2 ) {
 
 						/* Time to stop moving, reset the counters */
 						scroll_counter = 0;
@@ -998,6 +997,7 @@ void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *m
 
 	/* Check if we have a background texture to draw, and if so add it to the background layer */
 	if( _current_map->bg_texture != -1 )
+
 		set_tile( _draw_x, _draw_y, map_bg_texture_offset, 0, 0, 16 );
 
 	/* Make sure there's a texture to draw */
@@ -1012,17 +1012,20 @@ void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *m
 
 		if( (*map_tiles_ptr).top_layer ) {
 
-			/* Top Layer texture, draw to the top layer map */
+			/* Top Layer texture, draw to the top layer map and clear foreground layer */
 			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 18 );
+			set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
 		} else {
 
-			/* Bottom Layer texture, draw to the normal map */
+			/* Bottom Layer texture, draw to the normal map and clear top layer */
 			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
+			set_tile( _draw_x, _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
 		}
 	} else {
 
 		/* If not, draw a transparent tile to ensure we're not showing old tiles in the buffer */
 		set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+		set_tile( _draw_x, _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
 	}
 }
 
