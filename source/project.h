@@ -23,10 +23,10 @@ typedef void (*fnptr)(void);
 #define d_map_coordinates                 false	// Displays the coordinates of the display
 #define d_map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
 #define d_map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
-#define d_player_movement                 false	// Displays player position
-#define d_player_position                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
+#define d_player_position                 false	// Displays player position
+#define d_player_movement                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
 #define d_interaction_info                false	// Displays information about interaction tiles
-#define d_exit_map_info                   true	// Displays information about the map to load if exiting current map
+#define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
 #define d_animation_info                  false	// Displays information about the running animation
 #define d_textbox_info                    false	// Displays information about the current textbox
 #define d_npc_info                        false	// Displays information about the NPC

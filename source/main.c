@@ -158,9 +158,14 @@ void init( void ) {
 
 	/* Load the map and set our initial location */
 	map_pos = (struct dir_vec) { 10, 16 };
-	_current_map = &map_list[2];
+	_current_map = &map_list[0];
 
+	/* Draw the map */
 	draw_map_init( true );
+
+	/* Calculate our initial movement restrictions */
+	calculate_move_restrictions();
+
 
 	/* Enable the timer */
 	REG_TM0CNT = TM_FREQ_1 | TM_IRQ | TM_ENABLE;
@@ -609,6 +614,9 @@ int main( void ) {
 							/* Make sure we don't get stuck in the doorway */
 							exit_map.waiting_show = false;
 							exit_map.exit_map_pos = (struct dir_vec) { 0, 0 };
+
+							/* Calculate our new move restrictions */
+							calculate_move_restrictions();
 						}
 					}
 				}
@@ -702,9 +710,9 @@ int main( void ) {
 
 void debugging( void ) {
 
-	#if d_player_movement
+	#if d_player_position
 		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
-		write_string( write_text, 0, 1, 0 );
+		write_string( write_text, 0, 0, 0 );
 	#endif
 
 	#if d_exit_map_info
@@ -732,7 +740,7 @@ void debugging( void ) {
 		write_string( write_text, 0, 1, 0 );
 	#endif
 
-	#if d_player_position
+	#if d_player_movement
 		obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 		obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 
@@ -869,20 +877,42 @@ void calculate_move_restrictions( void ) {
 	/* We're stood on an exit tile, let's check which direction the exit is */
 	if( (*current_map_tile_ptr).exit_tile ) {
 
-		if( (*current_map_tile_ptr).exit_map_dir.y == 1 ) {
+		if( (*current_map_tile_ptr).exit_map_dir.y == 1 )
 			exit_tile.travel_n = true;
-		} else if( (*current_map_tile_ptr).exit_map_dir.x == 1 ) {
-			exit_tile.travel_e = true;
-		} else if( (*current_map_tile_ptr).exit_map_dir.y == -1 ) {
-			exit_tile.travel_s = true;
-		} else if( (*current_map_tile_ptr).exit_map_dir.x == -1 ) {
+
+		if( (*current_map_tile_ptr).exit_map_dir.x == -1 )
 			exit_tile.travel_w = true;
-		}
 
 		/* Now store the details of the map to load if we exit this one */
 		exit_map.exit_map_id = (*current_map_tile_ptr).exit_map_id;
 		exit_map.exit_map_pos = (*current_map_tile_ptr).exit_map_pos;
 	}
+
+	/* Move the pointer right 1 tile otherwise we won't see exit tiles to the east */
+	current_map_tile_ptr++;
+	if( (*current_map_tile_ptr).exit_tile ) {
+
+		if( (*current_map_tile_ptr).exit_map_dir.x == 1 )
+			exit_tile.travel_e = true;
+
+		/* Now store the details of the map to load if we exit this one */
+		exit_map.exit_map_id = (*current_map_tile_ptr).exit_map_id;
+		exit_map.exit_map_pos = (*current_map_tile_ptr).exit_map_pos;
+	}
+	current_map_tile_ptr--;
+
+	/* Move the pointer down 1 tile otherwise we won't see exit tiles to the south */
+	current_map_tile_ptr += _current_map->map_width;
+	if( (*current_map_tile_ptr).exit_tile ) {
+
+		if( (*current_map_tile_ptr).exit_map_dir.y == -1 )
+			exit_tile.travel_s = true;
+
+		/* Now store the details of the map to load if we exit this one */
+		exit_map.exit_map_id = (*current_map_tile_ptr).exit_map_id;
+		exit_map.exit_map_pos = (*current_map_tile_ptr).exit_map_pos;
+	}
+	current_map_tile_ptr -= _current_map->map_width;
 
 	/* Store which directions we're allowed to walk in the nearest tiles and if there are any interaction tiles */
 	allowed_movement = ( struct dir_en ) { false, false, false, false };
@@ -1012,9 +1042,6 @@ void draw_map_init( bool reset_scroll ) {
 
 	/* Calculate gaps around displayed map */
 	calculate_map_offsets();
-
-	/* Calculate movement restrictions */
-	calculate_move_restrictions();
 
 	/* Calculate the background texture offset */
 	map_bg_texture_offset = 0;
