@@ -628,8 +628,8 @@ int main( void ) {
 				else*/ scroll_counter++;
 
 				/* Scroll display */
-				_scroll_x = player.walk_dir.x * ( scroll_counter % 8 );
-				_scroll_y = -player.walk_dir.y * ( scroll_counter % 8 );
+				_scroll_x = ( player.walk_dir.x * ( scroll_counter % 8 ) ) + player.walk_dir.x;
+				_scroll_y = ( -player.walk_dir.y * ( scroll_counter % 8 ) ) - player.walk_dir.y;
 
 				REG_BG0HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
 				REG_BG0VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
