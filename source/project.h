@@ -451,7 +451,9 @@ static inline int g_mod( int k, int n ) {
 *********************************************************************************/
 void debugging( void );
 
+void calculate_move_restrictions( void );
 void calculate_map_offsets( void );
+
 void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) );
 void draw_map_init( bool reset_scroll );
 void set_player_sprite( uint8_t offset, bool flip_h );

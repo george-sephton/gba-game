@@ -11,47 +11,46 @@
 /*********************************************************************************
 	Global Variables
 *********************************************************************************/
-uint16_t _keys_current;
+uint16_t                                _keys_current;
 
 /* Game ticks */
 struct game_ticks                       ticks;
 
 /* Map */
-int16_t map_bg_texture_offset;
-struct map                              *_current_map;
+int16_t                                 map_bg_texture_offset;
+struct map                             *_current_map;
 struct exit_map_info                    exit_map;
 
 /* Player */
 struct player_struct                    player;
 
 /* Player movement variables */
-OBJ_ATTR                                *player_sprite;
+OBJ_ATTR                               *player_sprite, *debug_colour_n_1, *debug_colour_n_2, *debug_colour_e_1, *debug_colour_e_2, *debug_colour_s_1, *debug_colour_s_2, *debug_colour_w_1, *debug_colour_w_2;
 struct dir_vec                          map_pos; /* Map Position is defined as the position of the top left tile of the player */
 struct dir_vec                          scroll_pos;
 struct offset_vec                       _screen_offsets;
-uint8_t player_animation_tick, player_movement_delay;
-//struct dir_en allowed_movement, exit_tile, interaction_tile;
-//int16_t interaction_tile_id[4];
+struct dir_en                           allowed_movement, exit_tile, interaction_tile;
+uint8_t                                 player_animation_tick, player_movement_delay;
+int16_t                                 interaction_tile_id[4];
 
 /* Animation */
 struct animation_settings               animation;
 
-#define move_multiplier                 2 // Defines how many spaces to move at a time
+#define move_multiplier                 1 // Defines how many spaces to move at a time
 #define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
 
 /* Movement scrolling animation */
 struct dir_vec                          upcoming_map_pos;
-bool scroll_movement;
-uint16_t scroll_counter, move_tile_counter;
-int8_t _scroll_x, _scroll_y;
+bool                                    scroll_movement;
+uint16_t                                scroll_counter, move_tile_counter;
+int8_t                                  _scroll_x, _scroll_y;
 
 char write_text[ 128 ];
 OBJ_ATTR obj_buffer[ 128 ];
 
 /*********************************************************************************
-	Timer Variables
+	Timer IRQ Functions
 *********************************************************************************/
-/* Timer IRQ Prototypes */
 __attribute__ ( ( section( ".iwram" ), long_call ) ) void isr_master();
 __attribute__ ( ( section( ".iwram" ), long_call ) ) void timr0_callback();
 
@@ -77,9 +76,9 @@ void init( void ) {
 		Copy data to VRAM
 	*********************************************************************************/
 	/* Load texture colour palette */
-	memcpy( pal_bg_mem, _texture_colour_palette, sizeof( _texture_colour_palette ) );
+	tonccpy( pal_bg_mem, _texture_colour_palette, sizeof( _texture_colour_palette ) );
 	/* Load sprite colour palette */
-	memcpy( pal_obj_mem, _sprite_colour_palette, sizeof( _sprite_colour_palette ) );
+	tonccpy( pal_obj_mem, _sprite_colour_palette, sizeof( _sprite_colour_palette ) );
 
 	/* Load font into VRAM charblock 0 (memory address 0x0600:0000) */
 	memcpy( &tile_mem[0][0], _font_map, sizeof( _font_map ) );
@@ -109,6 +108,18 @@ void init( void ) {
 	player_sprite = &obj_buffer[0];
 	set_player_sprite( 0, false );
 
+	/* Initialise Debug Sprites */
+	#if d_player_position
+		debug_colour_n_1 = &obj_buffer[1];
+		debug_colour_n_2 = &obj_buffer[2];
+		debug_colour_e_1 = &obj_buffer[3];
+		debug_colour_e_2 = &obj_buffer[4];
+		debug_colour_s_1 = &obj_buffer[5];
+		debug_colour_s_2 = &obj_buffer[6];
+		debug_colour_w_1 = &obj_buffer[7];
+		debug_colour_w_2 = &obj_buffer[8];
+	#endif
+
 	player.reverse_walking_render = false;
 	player.walk_dir.x = 0;
 	player.walk_dir.y = 0;
@@ -123,6 +134,7 @@ void init( void ) {
 	move_tile_counter = 0;
 	upcoming_map_pos.x = 0;
 	upcoming_map_pos.y = 0;
+	allowed_movement = ( struct dir_en ) { true, true, true, true };
 
 	exit_map.waiting_load = false;
 	exit_map.waiting_show = false;
@@ -192,6 +204,9 @@ int main( void ) {
 			start_animation( fade_screen, 2, 0, true );
 		}
 
+		/*********************************************************************************
+			Movement
+		*********************************************************************************/
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
 		if( ( !animation.running ) && ( !scroll_movement ) /*&& ( !textbox_running )*/ ) {
 
@@ -243,6 +258,109 @@ int main( void ) {
 			}
 		}
 
+		/* Move the player according to button inputs and movement restrictions */
+		if( ( !animation.running ) && /*( !textbox_running ) &&*/ ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
+
+			bool start_exit_animation = false;
+
+			/* Player is moving north */
+			if( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) ) {
+
+				/* Map exit, start animation and load new map */
+				if( exit_tile.travel_n ) {  
+					start_exit_animation = true;
+				} else {
+
+					/* Move to a new tile, check if they're allowed there */
+					if( allowed_movement.travel_n ) {
+
+						/* Start the scroll animation and set the new tile position */
+						upcoming_map_pos.y = -1;
+						scroll_movement = true;
+						player_animation_tick = 0;
+					}
+				}
+
+			/* Player is moving east */
+			} else if( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) ) {
+				
+				/* Map exit, start animation and load new map */
+				if( exit_tile.travel_e ) {
+					start_exit_animation = true;
+				} else {
+
+					/* Move to a new tile, check if they're allowed there */
+					if( allowed_movement.travel_e ) {
+						
+						/* Start the scroll animation and set the new tile position */
+						upcoming_map_pos.x = 1;
+						scroll_movement = true;
+						player_animation_tick = 0;
+					}
+				}
+			
+			/* Player is moving south */
+			} else if( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) ) {
+			
+				/* Map exit, start animation and load new map */
+				if( exit_tile.travel_s ) {
+					start_exit_animation = true;
+				} else {
+
+					/* Move to a new tile, check if they're allowed there */
+					if( allowed_movement.travel_s)  {
+						
+						/* Start the scroll animation and set the new tile position */
+						upcoming_map_pos.y = 1;
+						scroll_movement = true;
+						player_animation_tick = 0;
+					}
+				}
+
+			/* Player is moving west */
+			} else if( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) ) {
+
+				/* Map exit, start animation and load new map */
+				if( exit_tile.travel_w ) {
+					start_exit_animation = true;
+				} else {
+
+					/* Move to a new tile, check if they're allowed there */
+					if( allowed_movement.travel_w ) {
+						
+						/* Start the scroll animation and set the new tile position */
+						upcoming_map_pos.x = -1;
+						scroll_movement = true;
+						player_animation_tick = 0;
+					}
+				}
+			}
+
+			/* Check if it's time to start the fade out animation */
+			if( start_exit_animation ) {
+
+				exit_map.waiting_load = true;
+				start_animation( fade_screen, 3, 0, true );
+			}
+		}
+		
+		/* Stop scrolling motion if we're can't continue, either because of allowed movement or an exit tile */
+		if( ( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !allowed_movement.travel_n ) ) || 
+			( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !allowed_movement.travel_e ) ) ||
+			( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( !allowed_movement.travel_s ) ) ||
+			( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( !allowed_movement.travel_w ) ) ) ||
+		  ( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( exit_tile.travel_n ) ) || 
+			( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( exit_tile.travel_e ) ) ||
+			( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) && ( exit_tile.travel_s ) ) ||
+			( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) && ( exit_tile.travel_w ) ) )
+		) {
+
+			scroll_counter = 0;  
+			scroll_movement = false;
+			upcoming_map_pos.x = 0;
+			upcoming_map_pos.y = 0;
+		}
+
 		/*********************************************************************************
 			Drawing
 		*********************************************************************************/
@@ -261,11 +379,6 @@ int main( void ) {
 			}
 		} else {
 
-			if( !scroll_movement ) {
-				player_animation_tick = 0;
-				player.reverse_walking_render = false;
-			}
-
 			/* Player is walking, draw the walking sprite */
 			if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) ) ) { // Walking N
 				set_player_sprite( 5, player.reverse_walking_render );
@@ -275,83 +388,6 @@ int main( void ) {
 				set_player_sprite( 1, player.reverse_walking_render );
 			} else if( ( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) ) ) { // Walking W
 				set_player_sprite( ( player.reverse_walking_render ? 2 : 3 ), false );
-			}
-		}
-
-		/* Move the player according to button inputs and movement restrictions */
-		if( ( !animation.running ) && /*( !textbox_running ) &&*/ ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
-
-			/* Player is moving north */
-			if( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) ) {
-
-				/* Map exit, start animation and load new map */
-				/*if( exit_tile.travel_n ) {  
-					start_exit_animation = true;
-				} else {*/
-
-					/* Move to a new tile, check if they're allowed there */
-					//if( allowed_movement.travel_n ) {
-
-						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.y = -1;
-						scroll_movement = true;
-						player_animation_tick = 0;
-					//}
-				//}
-
-			/* Player is moving east */
-			} else if( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) ) {
-				
-				/* Map exit, start animation and load new map */
-				/*if( exit_tile.travel_e ) {
-					start_exit_animation = true;
-				} else {*/
-
-					/* Move to a new tile, check if they're allowed there */
-					//if( allowed_movement.travel_e ) {
-						
-						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.x = 1;
-						scroll_movement = true;
-						player_animation_tick = 0;
-					//}
-				//}
-			
-			/* Player is moving south */
-			} else if( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == -1 ) ) {
-			
-				/* Map exit, start animation and load new map */
-				/*if( exit_tile.travel_s ) {
-					start_exit_animation = true;
-				} else {*/
-
-					/* Move to a new tile, check if they're allowed there */
-					//if( allowed_movement.travel_s)  {
-						
-						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.y = 1;
-						scroll_movement = true;
-						player_animation_tick = 0;
-					//}
-				//}
-
-			/* Player is moving west */
-			} else if( ( player.walk_dir.x == -1 ) && ( player.walk_dir.y == 0 ) ) {
-
-				/* Map exit, start animation and load new map */
-				/*if( exit_tile.travel_w ) {
-					start_exit_animation = true;
-				} else {*/
-
-					/* Move to a new tile, check if they're allowed there */
-					//if( allowed_movement.travel_w ) {
-						
-						/* Start the scroll animation and set the new tile position */
-						upcoming_map_pos.x = -1;
-						scroll_movement = true;
-						player_animation_tick = 0;
-					//}
-				//}
 			}
 		}
 
@@ -550,11 +586,10 @@ int main( void ) {
 						if( exit_map.waiting_load ) {
 
 							/* Move the player to the correct position */
-							//map_pos = { exit_map.exit_map_pos.x, exit_map.exit_map_pos.y };
-							map_pos = (struct dir_vec) { 0, 0 };
+							map_pos = (struct dir_vec) { exit_map.exit_map_pos.x, exit_map.exit_map_pos.y };
+
 							/* Set the new map */
-							//_current_map = &map_list[ exit_map.exit_map_id ];
-							_current_map = &map_list[ 0 ];
+							_current_map = &map_list[ exit_map.exit_map_id ];
 
 							/* Render new map whilst the screen is black */
 							draw_map_init( true );
@@ -624,6 +659,9 @@ int main( void ) {
 						scroll_counter = 0;
 						move_tile_counter = 0;
 
+						/* Calculate new movement restrictions */
+						calculate_move_restrictions();
+
 						/* If the player isn't holding down a button, let's stop moving */
 						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
 								( ( player.walk_dir.x == 1 ) && ( player.walk_dir.y == 0 ) && ( !key_down( KEY_RIGHT ) ) ) ||
@@ -647,8 +685,7 @@ int main( void ) {
 
 				player_animation_tick++;
 
-				/* If holding B, make the player run, if the map allows running */
-				if( ( ( player_animation_tick >= 6 ) && ( ( ( !key_down( KEY_B ) ) && ( _current_map->running_en ) ) || ( !_current_map->running_en ) ) ) || ( ( player_animation_tick >= 3 ) && ( key_down( KEY_B ) ) && ( _current_map->running_en ) ) ) {
+				if( player_animation_tick >= 6 ) {
 					player_animation_tick = 0;
 					player.reverse_walking_render = !player.reverse_walking_render;
 				}
@@ -656,7 +693,7 @@ int main( void ) {
 		}
 
 		/* Update player sprite */
-		oam_copy( oam_mem, obj_buffer, 1 );
+		oam_copy( oam_mem, obj_buffer, 9 );
 
 		/* Wait for video sync */
 		vid_vsync();
@@ -666,17 +703,22 @@ int main( void ) {
 void debugging( void ) {
 
 	#if d_player_movement
-		sprintf( write_text, " P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
+		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_exit_map_info
+		sprintf( write_text, "E(%d,%d,%d)P(%d %d)", exit_map.waiting_load, exit_map.waiting_show, exit_map.exit_map_id, exit_map.exit_map_pos.x, exit_map.exit_map_pos.y );
 		write_string( write_text, 0, 1, 0 );
 	#endif
 
 	#if d_key_info
-		sprintf( write_text, " K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
+		sprintf( write_text, "K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
 		write_string( write_text, 0, 1, 0 );
 	#endif
 
 	#if d_tick_info
-		sprintf( write_text, " D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)game_tick );
+		sprintf( write_text, "D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)ticks.game );
 		write_string( write_text, 0, 2, 0 );
 	#endif
 
@@ -686,8 +728,122 @@ void debugging( void ) {
 	#endif
 
 	#if d_map_rendering_offsets
-		sprintf( write_text, " P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
+		sprintf( write_text, "P(%d,%d)O(%d,%d,%d,%d)", map_pos.x, map_pos.y, _screen_offsets.n, _screen_offsets.e, _screen_offsets.s, _screen_offsets.w );
 		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_player_position
+		obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+
+		/* Draw coloured squares to indicate player's allowed movement */
+		if( exit_tile.travel_n ) {
+			
+			/* Blue tile since this is an exit tile */
+			obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+		} else {
+
+			if( map_pos.y != 0 ) {
+
+				/* Green tile as we are allow to walk in this direction */
+				if(allowed_movement.travel_n) {
+					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+				} else {
+					/* Red tile as we're not allowed to walk in this direction */
+					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+				}
+			} else {
+
+				/* Yellow tile as this is the edge of the map */
+				obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+			}
+		}
+
+		if( exit_tile.travel_e ) {
+
+			obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+		} else {
+
+			if( map_pos.x != ( _current_map->map_width - 1 ) ) {
+
+				if( allowed_movement.travel_e ) {
+					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+				} else {
+					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+				}
+			} else {
+				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+			}
+		}
+
+		if( exit_tile.travel_s ) {
+
+			obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+		} else {
+
+			if( map_pos.y != ( _current_map->map_height - 1 ) ) {
+
+				if( allowed_movement.travel_s ) {
+					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+				} else {
+					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+				}
+			} else {
+				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+			}
+		}
+
+		if( exit_tile.travel_w ) {
+
+			obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+		} else {
+
+			if( map_pos.x != 0 ) {
+
+				if( allowed_movement.travel_w ) {
+					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+				} else {
+					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+				}
+			} else {
+				obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+			}
+		}
+
+		/* Set positions */
+		obj_set_pos( debug_colour_n_1, 112, 64 );
+		obj_set_pos( debug_colour_n_2, 120, 64 );
+		obj_set_pos( debug_colour_e_1, 128, 72 );
+		obj_set_pos( debug_colour_e_2, 128, 80 );
+		obj_set_pos( debug_colour_s_1, 112, 88 );
+		obj_set_pos( debug_colour_s_2, 120, 88 );
+		obj_set_pos( debug_colour_w_1, 104, 72 );
+		obj_set_pos( debug_colour_w_2, 104, 80 );
 	#endif
 	
 	#if d_map_coordinates
@@ -699,6 +855,93 @@ void debugging( void ) {
 		sprintf( write_text, "012345678901234567890123456789" );
 		write_string( write_text, 0, 19, 0 );
 	#endif
+}
+
+void calculate_move_restrictions( void ) {
+
+	const struct map_tile (*current_map_tile_ptr) = _current_map->map_tiles_ptr; /* Get a pointer to the current tile */
+	current_map_tile_ptr += map_pos.y * _current_map->map_width; /* Move to the correct y value */
+	current_map_tile_ptr += map_pos.x; /* Move to the correct x value */
+
+	/* See if we're stood on an exit tile or not */
+	exit_tile = ( struct dir_en ) { false, false, false, false };
+
+	/* We're stood on an exit tile, let's check which direction the exit is */
+	if( (*current_map_tile_ptr).exit_tile ) {
+
+		if( (*current_map_tile_ptr).exit_map_dir.y == 1 ) {
+			exit_tile.travel_n = true;
+		} else if( (*current_map_tile_ptr).exit_map_dir.x == 1 ) {
+			exit_tile.travel_e = true;
+		} else if( (*current_map_tile_ptr).exit_map_dir.y == -1 ) {
+			exit_tile.travel_s = true;
+		} else if( (*current_map_tile_ptr).exit_map_dir.x == -1 ) {
+			exit_tile.travel_w = true;
+		}
+
+		/* Now store the details of the map to load if we exit this one */
+		exit_map.exit_map_id = (*current_map_tile_ptr).exit_map_id;
+		exit_map.exit_map_pos = (*current_map_tile_ptr).exit_map_pos;
+	}
+
+	/* Store which directions we're allowed to walk in the nearest tiles and if there are any interaction tiles */
+	allowed_movement = ( struct dir_en ) { false, false, false, false };
+	interaction_tile = ( struct dir_en ) { false, false, false, false };
+
+	if( map_pos.y != 0 ) {
+
+		current_map_tile_ptr -= _current_map->map_width; // Move pointer up a row
+		
+		allowed_movement.travel_n = (*current_map_tile_ptr).can_walk_s;
+		interaction_tile.travel_n = (*current_map_tile_ptr).interact_tile;
+
+		if( interaction_tile.travel_n ) interaction_tile_id[0] = (*current_map_tile_ptr).interact_id;
+		else interaction_tile_id[0] = 0;
+
+		current_map_tile_ptr += _current_map->map_width; // Move pointer back to same row as player
+	}
+	if( map_pos.x != ( _current_map->map_width - 1 ) ) {
+
+		current_map_tile_ptr += 2; // Move pointer to 2 columns along
+
+		allowed_movement.travel_e = (*current_map_tile_ptr).can_walk_w;
+		interaction_tile.travel_e = (*current_map_tile_ptr).interact_tile;
+
+		if( interaction_tile.travel_e ) interaction_tile_id[1] = (*current_map_tile_ptr).interact_id;
+		else interaction_tile_id[1] = 0;
+
+		current_map_tile_ptr -= 2; // Move pointer back to same column as player
+	}
+	if( map_pos.y != ( _current_map->map_height - 1 ) ) {
+
+		current_map_tile_ptr += ( _current_map->map_width * 2); // Move pointer down 2 rows
+
+		allowed_movement.travel_s = (*current_map_tile_ptr).can_walk_n;
+		interaction_tile.travel_s = (*current_map_tile_ptr).interact_tile;
+
+		if( interaction_tile.travel_s ) interaction_tile_id[2] = (*current_map_tile_ptr).interact_id;
+		else interaction_tile_id[2] = 0;
+
+		current_map_tile_ptr -= ( _current_map->map_width * 2); // Move pointer back to same row as player
+	}
+	if( map_pos.x != 0 ) {
+
+		current_map_tile_ptr--; // Move pointer back a column
+
+		allowed_movement.travel_w = (*current_map_tile_ptr).can_walk_e;
+		interaction_tile.travel_w = (*current_map_tile_ptr).interact_tile;
+
+		if( interaction_tile.travel_w ) interaction_tile_id[3] = (*current_map_tile_ptr).interact_id;
+		else interaction_tile_id[3] = 0;
+
+		current_map_tile_ptr++; // Move pointer back to same column as player
+	}
+
+	/* Add movement restrictions based on interaction tiles */
+	if( interaction_tile.travel_n ) allowed_movement.travel_n = false;
+	if( interaction_tile.travel_e ) allowed_movement.travel_e = false;
+	if( interaction_tile.travel_s ) allowed_movement.travel_s = false;
+	if( interaction_tile.travel_w ) allowed_movement.travel_w = false;
 }
 
 void calculate_map_offsets( void ) {
@@ -769,6 +1012,9 @@ void draw_map_init( bool reset_scroll ) {
 
 	/* Calculate gaps around displayed map */
 	calculate_map_offsets();
+
+	/* Calculate movement restrictions */
+	calculate_move_restrictions();
 
 	/* Calculate the background texture offset */
 	map_bg_texture_offset = 0;
