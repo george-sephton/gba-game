@@ -108,7 +108,7 @@ void init( void ) {
 	set_player_sprite( 0, false );
 
 	/* Initialise Debug Sprites */
-	#if d_player_position
+	#if d_player_movement
 		debug_colour_n_1 = &obj_buffer[1];
 		debug_colour_n_2 = &obj_buffer[2];
 		debug_colour_e_1 = &obj_buffer[3];
@@ -191,9 +191,6 @@ int main( void ) {
 
 		/* Poll input keys */
 		key_poll();
-	
-		/* Show debugger */
-		debugging();
 
 		/* Development - Refresh display when B is pressed */
 		if( key_down( KEY_B ) ) {
@@ -699,6 +696,9 @@ int main( void ) {
 			}
 		}
 
+		/* Show debugger */
+		debugging();
+
 		/* Update player sprite */
 		oam_copy( oam_mem, obj_buffer, 9 );
 
@@ -740,18 +740,6 @@ void debugging( void ) {
 	#endif
 
 	#if d_player_movement
-		obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-		obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-
-		obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-		obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-
-		obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-		obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-
-		obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-		obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-
 		/* Draw coloured squares to indicate player's allowed movement */
 		if( exit_tile.travel_n ) {
 			
@@ -785,7 +773,7 @@ void debugging( void ) {
 			obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
-			if( map_pos.x != ( _current_map->map_width - 1 ) ) {
+			if( map_pos.x != ( _current_map->map_width - 2 ) ) {
 
 				if( allowed_movement.travel_e ) {
 					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
@@ -806,7 +794,7 @@ void debugging( void ) {
 			obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
-			if( map_pos.y != ( _current_map->map_height - 1 ) ) {
+			if( map_pos.y != ( _current_map->map_height - 2 ) ) {
 
 				if( allowed_movement.travel_s ) {
 					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
@@ -816,8 +804,8 @@ void debugging( void ) {
 					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 				}
 			} else {
-				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
 			}
 		}
 
@@ -929,7 +917,7 @@ void calculate_move_restrictions( void ) {
 
 		current_map_tile_ptr += _current_map->map_width; // Move pointer back to same row as player
 	}
-	if( map_pos.x != ( _current_map->map_width - 1 ) ) {
+	if( map_pos.x != ( _current_map->map_width - 2 ) ) {
 
 		current_map_tile_ptr += 2; // Move pointer to 2 columns along
 
@@ -941,7 +929,7 @@ void calculate_move_restrictions( void ) {
 
 		current_map_tile_ptr -= 2; // Move pointer back to same column as player
 	}
-	if( map_pos.y != ( _current_map->map_height - 1 ) ) {
+	if( map_pos.y != ( _current_map->map_height - 2 ) ) {
 
 		current_map_tile_ptr += ( _current_map->map_width * 2); // Move pointer down 2 rows
 
