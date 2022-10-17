@@ -11,8 +11,6 @@
 /*********************************************************************************
 	Global Variables
 *********************************************************************************/
-uint16_t                                _keys_current;
-
 /* Game ticks */
 struct game_ticks                       ticks;
 
@@ -25,16 +23,13 @@ struct exit_map_info                    exit_map;
 struct player_struct                    player;
 
 /* Player movement variables */
-OBJ_ATTR                               *player_sprite, *debug_colour_n_1, *debug_colour_n_2, *debug_colour_e_1, *debug_colour_e_2, *debug_colour_s_1, *debug_colour_s_2, *debug_colour_w_1, *debug_colour_w_2;
+OBJ_ATTR                               *player_sprite;
 struct dir_vec                          map_pos; /* Map Position is defined as the position of the top left tile of the player */
 struct dir_vec                          scroll_pos;
 struct offset_vec                       _screen_offsets;
 struct dir_en                           allowed_movement, exit_tile, interaction_tile;
 uint8_t                                 player_animation_tick, player_movement_delay;
 int16_t                                 interaction_tile_id[4];
-
-/* Animation */
-struct animation_settings               animation;
 
 #define player_movement_delay_val       5 // Delay value before a player will start walking, to allow them to change the direction they're facing without walking
 
@@ -44,8 +39,12 @@ bool                                    scroll_movement;
 uint16_t                                scroll_counter, move_tile_counter;
 int8_t                                  _scroll_x, _scroll_y;
 
-char write_text[ 128 ];
-OBJ_ATTR obj_buffer[ 128 ];
+/* Sprites */
+OBJ_ATTR                               *debug_colour_n_1, *debug_colour_n_2, *debug_colour_e_1, *debug_colour_e_2, *debug_colour_s_1, *debug_colour_s_2, *debug_colour_w_1, *debug_colour_w_2;
+OBJ_ATTR                                obj_buffer[ 128 ];
+
+char demo_text1[][29] = { "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?", "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?" };
+//char demo_text1[][29] = { "This is a test of the", "textbox mechanism." };
 
 /*********************************************************************************
 	Timer IRQ Functions
@@ -109,14 +108,14 @@ void init( void ) {
 
 	/* Initialise Debug Sprites */
 	#if d_player_movement
-		debug_colour_n_1 = &obj_buffer[1];
-		debug_colour_n_2 = &obj_buffer[2];
-		debug_colour_e_1 = &obj_buffer[3];
-		debug_colour_e_2 = &obj_buffer[4];
-		debug_colour_s_1 = &obj_buffer[5];
-		debug_colour_s_2 = &obj_buffer[6];
-		debug_colour_w_1 = &obj_buffer[7];
-		debug_colour_w_2 = &obj_buffer[8];
+		debug_colour_n_1 = &obj_buffer[2];
+		debug_colour_n_2 = &obj_buffer[3];
+		debug_colour_e_1 = &obj_buffer[4];
+		debug_colour_e_2 = &obj_buffer[5];
+		debug_colour_s_1 = &obj_buffer[6];
+		debug_colour_s_2 = &obj_buffer[7];
+		debug_colour_w_1 = &obj_buffer[8];
+		debug_colour_w_2 = &obj_buffer[9];
 	#endif
 
 	player.reverse_walking_render = false;
@@ -139,6 +138,18 @@ void init( void ) {
 	exit_map.waiting_show = false;
 	exit_map.exit_map_id = 0;
 	exit_map.exit_map_pos = (struct dir_vec) {0, 0};
+  
+	/* Initialise textbox variables */
+	textbox_running = false;
+	textbox_update = false;
+
+	scroll_arrow_count = 0;
+	scroll_arrow_offset = 0;
+	textbox_line = 0;
+	textbox_button_delay = 0;
+
+	write_text_line_count = 0;
+	write_text_char_count = 1;
 
 	/* Initialise timer and ticks */
 	ticks = (struct game_ticks) { 0, 0, 0 };
@@ -156,15 +167,14 @@ void init( void ) {
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec) { 10, 16 };
-	_current_map = &map_list[0];
+	map_pos = (struct dir_vec) { 2, 4 };
+	_current_map = &map_list[1];
 
 	/* Draw the map */
 	draw_map_init( true );
 
 	/* Calculate our initial movement restrictions */
 	calculate_move_restrictions();
-
 
 	/* Enable the timer */
 	REG_TM0CNT = TM_FREQ_1 | TM_IRQ | TM_ENABLE;
@@ -195,21 +205,18 @@ int main( void ) {
 		/* Development - Refresh display when B is pressed */
 		if( key_down( KEY_B ) ) {
 
-			draw_map_init( true );
 		}
 
 		/* Development - Fade display out when A is pressed */
 		if( key_down( KEY_A ) ) {
 
-			exit_map.waiting_load = true;
-			start_animation( fade_screen, 2, 0, true );
 		}
 
 		/*********************************************************************************
 			Movement
 		*********************************************************************************/
 		/* Check input presses as they happen, unless there's an animation running, in which case we don't care */
-		if( ( !animation.running ) && ( !scroll_movement ) /*&& ( !textbox_running )*/ ) {
+		if( ( !animation.running ) && ( !scroll_movement ) && ( !textbox_running ) ) {
 
 			if( ( key_down( KEY_UP ) ) || ( key_down( KEY_RIGHT ) ) || ( key_down( KEY_DOWN ) ) || ( key_down( KEY_LEFT ) ) ) {
 
@@ -260,7 +267,7 @@ int main( void ) {
 		}
 
 		/* Move the player according to button inputs and movement restrictions */
-		if( ( !animation.running ) && /*( !textbox_running ) &&*/ ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
+		if( ( !animation.running ) && ( !textbox_running ) && ( !scroll_movement ) && ( player_movement_delay >= player_movement_delay_val ) ) { // Don't alter movement if an animation is running
 
 			bool start_exit_animation = false;
 
@@ -360,6 +367,19 @@ int main( void ) {
 			scroll_movement = false;
 			upcoming_map_pos.x = 0;
 			upcoming_map_pos.y = 0;
+		}
+
+		/*********************************************************************************
+			Interactions
+		*********************************************************************************/
+		if( ( ( ( interaction_tile.travel_n ) && ( player.face_dir.x == 0 ) && ( player.face_dir.y == 1 ) ) ||
+			  ( ( interaction_tile.travel_e ) && ( player.face_dir.x == 1 ) && ( player.face_dir.y == 0 ) ) ||
+			  ( ( interaction_tile.travel_s ) && ( player.face_dir.x == 0 ) && ( player.face_dir.y == -1 ) ) ||
+			  ( ( interaction_tile.travel_w ) && ( player.face_dir.x == -1 ) && ( player.face_dir.y == 0 ) ) ) &&
+			  ( key_down( KEY_A ) ) && ( textbox_button_delay == 0 ) && ( !textbox_running ) ) {
+
+			/* User pressed the A Button at an interaction */
+			open_textbox( demo_text1, ( sizeof( demo_text1 ) / 29 ) );
 		}
 
 		/*********************************************************************************
@@ -685,7 +705,7 @@ int main( void ) {
 			}
 
 			/* If the player is walking, let's make their little legs move or make them run if holding B */
-			if( ( !animation.running ) || ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
+			if( ( !animation.running ) && ( ( player.walk_dir.x != 0 ) || ( player.walk_dir.y != 0 ) ) ) {
 
 				player_animation_tick++;
 
@@ -699,6 +719,9 @@ int main( void ) {
 		/* Show debugger */
 		debugging();
 
+		/* Draw the textbox, if running */
+		draw_textbox();
+
 		/* Update player sprite */
 		oam_copy( oam_mem, obj_buffer, 9 );
 
@@ -711,6 +734,11 @@ void debugging( void ) {
 
 	#if d_player_position
 		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
+		write_string( write_text, 0, 0, 0 );
+	#endif
+
+	#if d_textbox_info
+		sprintf( write_text,"R(%d,%d)C(%d/%d)T(%d,%d)D(%d)", textbox_running, textbox_update, textbox_line, total_textbox_lines, write_text_char_count, write_text_line_count, textbox_button_delay );
 		write_string( write_text, 0, 0, 0 );
 	#endif
 
@@ -744,89 +772,89 @@ void debugging( void ) {
 		if( exit_tile.travel_n ) {
 			
 			/* Blue tile since this is an exit tile */
-			obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
 			if( map_pos.y != 0 ) {
 
 				/* Green tile as we are allow to walk in this direction */
 				if(allowed_movement.travel_n) {
-					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
 				} else {
 					/* Red tile as we're not allowed to walk in this direction */
-					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
 				}
 			} else {
 
 				/* Yellow tile as this is the edge of the map */
-				obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
 			}
 		}
 
 		if( exit_tile.travel_e ) {
 
-			obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
 			if( map_pos.x != ( _current_map->map_width - 2 ) ) {
 
 				if( allowed_movement.travel_e ) {
-					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
 				} else {
-					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
 				}
 			} else {
-				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 			}
 		}
 
 		if( exit_tile.travel_s ) {
 
-			obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
 			if( map_pos.y != ( _current_map->map_height - 2 ) ) {
 
 				if( allowed_movement.travel_s ) {
-					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
 				} else {
-					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
 				}
 			} else {
-				obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
 			}
 		}
 
 		if( exit_tile.travel_w ) {
 
-			obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 110 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+			obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 		} else {
 
 			if( map_pos.x != 0 ) {
 
 				if( allowed_movement.travel_w ) {
-					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 108 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
 				} else {
-					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
 				}
 			} else {
-				obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 112 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
 			}
 		}
 
@@ -839,6 +867,25 @@ void debugging( void ) {
 		obj_set_pos( debug_colour_s_2, 120, 88 );
 		obj_set_pos( debug_colour_w_1, 104, 72 );
 		obj_set_pos( debug_colour_w_2, 104, 80 );
+	#endif
+
+	#if d_interaction_info
+		if( ( interaction_tile.travel_n ) && ( player.face_dir.x == 0 ) && ( player.face_dir.y == 1 ) ) {
+			sprintf( write_text,"ID(%d)", interaction_tile_id[0] );
+			write_string( write_text, 0, 0, 0 );
+		} else if( ( interaction_tile.travel_e ) && ( player.face_dir.x == 1 ) && ( player.face_dir.y == 0 ) ) {
+			sprintf( write_text,"ID(%d)", interaction_tile_id[1] );
+			write_string( write_text, 0, 0, 0 );
+		} else if( ( interaction_tile.travel_s ) && ( player.face_dir.x == 0 ) && ( player.face_dir.y == -1 ) ) {
+			sprintf( write_text,"ID(%d)", interaction_tile_id[2] );
+			write_string( write_text, 0, 0, 0 );
+		} else if( ( interaction_tile.travel_w ) && ( player.face_dir.x == -1 ) && ( player.face_dir.y == 0 ) ) {
+			sprintf( write_text,"ID(%d)", interaction_tile_id[3] );
+			write_string( write_text, 0, 0, 0 );
+		} else {
+			sprintf( write_text,"          " );
+			write_string( write_text, 0, 0, 0 );
+		}
 	#endif
 	
 	#if d_map_coordinates
@@ -1109,7 +1156,7 @@ void draw_map_init( bool reset_scroll ) {
 void set_player_sprite( uint8_t offset, bool flip_h ) {
 
 	/* Update the offset of the player sprite */
-	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( offset * 8 ) | ATTR2_PRIO( 1 ) ) );
+	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( ( 1 + offset ) * 8 ) | ATTR2_PRIO( 1 ) ) );
 	obj_set_pos( player_sprite, 112, 72 );
 }
 

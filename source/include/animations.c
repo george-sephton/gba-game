@@ -1,5 +1,7 @@
 #include "animations.h"
 
+struct animation_settings animation;
+
 void start_animation( animation_function func_ptr, uint8_t occurance, uint8_t repeat, bool reverse ) {
 	
 	animation.running = true;
@@ -10,6 +12,10 @@ void start_animation( animation_function func_ptr, uint8_t occurance, uint8_t re
 	animation.tick = 0;
 	animation.occurance = occurance;
 	animation.repeat = repeat;
+
+	/* Stop the player's movement */
+	player.walk_dir.x = 0;
+	player.walk_dir.y = 0;
 }
 
 void repeat_animation( void ) {

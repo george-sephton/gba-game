@@ -3,6 +3,7 @@
 
 #include "project.h"
 
+extern struct player_struct player;
 extern struct animation_settings animation;
 
 extern const uint16_t _sprite_colour_palette_length;
