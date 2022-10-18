@@ -22,16 +22,15 @@ typedef void (*fnptr)(void);
 *********************************************************************************/
 #define d_map_coordinates                 false	// Displays the coordinates of the display
 #define d_map_rendering_offsets           false	// Displays player position on map and no of calculated empty rows & columns (for initial draw)
-#define d_map_rendering_scroll            false	// Displays player position on map and no of calculated extra pixels to render 
 #define d_player_position                 false	// Displays player position
 #define d_player_movement                 false	// Draws coloured boxes to indicate if player can move or if there are obstacles, edge of map or exit tiles
 #define d_interaction_info                false	// Displays information about interaction tiles
 #define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
 #define d_animation_info                  false	// Displays information about the running animation
-#define d_textbox_info                    true	// Displays information about the current textbox
-#define d_npc_info                        false	// Displays information about the NPC
+#define d_textbox_info                    false	// Displays information about the current textbox
 #define d_key_info                        false	// Displays information about the keys being pressed
 #define d_tick_info                       false	// Displays various timer ticks
+#define d_npc_info                        false	// Displays information about the NPC
 
 /*********************************************************************************
 	Register Definitions
@@ -454,6 +453,8 @@ void debugging( void );
 
 void calculate_move_restrictions( void );
 void calculate_map_offsets( void );
+void show_exit_arrow( void );
+void hide_exit_arrow( void );
 
 void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) );
 void draw_map_init( bool reset_scroll );

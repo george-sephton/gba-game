@@ -41,9 +41,10 @@ int8_t                                  _scroll_x, _scroll_y;
 
 /* Sprites */
 OBJ_ATTR                               *debug_colour_n_1, *debug_colour_n_2, *debug_colour_e_1, *debug_colour_e_2, *debug_colour_s_1, *debug_colour_s_2, *debug_colour_w_1, *debug_colour_w_2;
+OBJ_ATTR                               *exit_arrow_h, *exit_arrow_v;
 OBJ_ATTR                                obj_buffer[ 128 ];
 
-char demo_text1[][29] = { "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?", "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?" };
+char demo_text1[][29] = { "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?" };
 //char demo_text1[][29] = { "This is a test of the", "textbox mechanism." };
 
 /*********************************************************************************
@@ -104,22 +105,41 @@ void init( void ) {
 	/* Initialise our sprites */
 	oam_init( obj_buffer, 128 );
 
-	/* Initialise Player */
+	/* Initialise debug sprites */
+	#if d_player_movement
+		debug_colour_n_1 = &obj_buffer[120];
+		debug_colour_n_2 = &obj_buffer[121];
+		debug_colour_e_1 = &obj_buffer[122];
+		debug_colour_e_2 = &obj_buffer[123];
+		debug_colour_s_1 = &obj_buffer[124];
+		debug_colour_s_2 = &obj_buffer[125];
+		debug_colour_w_1 = &obj_buffer[126];
+		debug_colour_w_2 = &obj_buffer[127];
+
+		obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+	#endif
+
+	/* Initialise player sprite */
 	player_sprite = &obj_buffer[0];
 	set_player_sprite( 0, false );
 
-	/* Initialise Debug Sprites */
-	#if d_player_movement
-		debug_colour_n_1 = &obj_buffer[2];
-		debug_colour_n_2 = &obj_buffer[3];
-		debug_colour_e_1 = &obj_buffer[4];
-		debug_colour_e_2 = &obj_buffer[5];
-		debug_colour_s_1 = &obj_buffer[6];
-		debug_colour_s_2 = &obj_buffer[7];
-		debug_colour_w_1 = &obj_buffer[8];
-		debug_colour_w_2 = &obj_buffer[9];
-	#endif
+	/* Exit arrow sprite */
+	exit_arrow_v = &obj_buffer[1];
+	exit_arrow_h = &obj_buffer[2];
+	obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+	obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 
+	/* Update sprites */
+	oam_copy( oam_mem, obj_buffer, 128 );
+
+	/* Initialise Player variables */
 	player.reverse_walking_render = false;
 	player.walk_dir.x = 0;
 	player.walk_dir.y = 0;
@@ -181,8 +201,8 @@ void init( void ) {
 	REG_TM0CNT = TM_FREQ_1 | TM_IRQ | TM_ENABLE;
 
 	/* Enabled timer interrupts */
-	irq_init(master_isrs[0]);
-	irq_add(II_TIMER0, timr0_callback);
+	irq_init( master_isrs[0] );
+	irq_add( II_TIMER0, timr0_callback );
 
 	/* Initialise animation variables - none in progress */
 	animation.running = false;
@@ -203,13 +223,13 @@ int main( void ) {
 		/* Poll input keys */
 		key_poll();
 
-		/* Development - Refresh display when B is pressed */
-		if( key_down( KEY_B ) ) {
+		/* Development - __ when A is pressed */
+		if( key_down( KEY_A ) ) {
 
 		}
 
-		/* Development - Fade display out when A is pressed */
-		if( key_down( KEY_A ) ) {
+		/* Development - __ when B is pressed */
+		if( key_down( KEY_B ) ) {
 
 		}
 
@@ -620,6 +640,9 @@ int main( void ) {
 							exit_map.waiting_load = false;
 							exit_map.waiting_show = true;
 
+							/* Hide the exit arrow */
+							hide_exit_arrow();
+
 							/* and trigger the fade in animation */
 							start_animation( fade_screen, 2, 0, false );
 
@@ -665,6 +688,8 @@ int main( void ) {
 				REG_BG2HOFS = ( 8 * scroll_pos.x ) + _scroll_x;
 				REG_BG2VOFS = ( 8 * scroll_pos.y ) + _scroll_y;
 
+				hide_exit_arrow();
+
 				if( ( scroll_counter % 8 ) == 7 ) {
 
 					/* Count how many tiles we've moved so far */
@@ -686,6 +711,9 @@ int main( void ) {
 
 						/* Calculate new movement restrictions */
 						calculate_move_restrictions();
+
+						/* Show any exit arrow if needed */
+						show_exit_arrow();
 
 						/* If the player isn't holding down a button, let's stop moving */
 						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
@@ -724,7 +752,11 @@ int main( void ) {
 		draw_textbox();
 
 		/* Update player sprite */
-		oam_copy( oam_mem, obj_buffer, 9 );
+		#if d_player_movement
+			oam_copy( oam_mem, obj_buffer, 128 );
+		#else
+			oam_copy( oam_mem, obj_buffer, 3 );
+		#endif
 
 		/* Wait for video sync */
 		vid_vsync();
@@ -732,35 +764,15 @@ int main( void ) {
 }
 
 void debugging( void ) {
-
-	#if d_player_position
-		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
-		write_string( write_text, 0, 0, 0 );
-	#endif
-
-	#if d_textbox_info
-		sprintf( write_text,"R(%d,%d)C(%d/%d)T(%d,%d)D(%d)", textbox_running, textbox_update, textbox_line, total_textbox_lines, write_text_char_count, write_text_line_count, ticks.interaction_delay );
-		write_string( write_text, 0, 0, 0 );
-	#endif
-
-	#if d_exit_map_info
-		sprintf( write_text, "E(%d,%d,%d)P(%d %d)", exit_map.waiting_load, exit_map.waiting_show, exit_map.exit_map_id, exit_map.exit_map_pos.x, exit_map.exit_map_pos.y );
-		write_string( write_text, 0, 1, 0 );
-	#endif
-
-	#if d_key_info
-		sprintf( write_text, "K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
-		write_string( write_text, 0, 1, 0 );
-	#endif
-
-	#if d_tick_info
-		sprintf( write_text, "D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)ticks.game );
-		write_string( write_text, 0, 2, 0 );
-	#endif
-
-	#if d_animation_info
-		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
-		write_string( write_text, 0, 0, 0 );
+	
+	#if d_map_coordinates
+		uint8_t i;
+		for( i = 0; i < 10; i++ ) {
+			write_character( ( 48 + i ), 0, i );
+			write_character( ( 48 + i ), 0, ( i + 10 ) );
+		}
+		sprintf( write_text, "012345678901234567890123456789" );
+		write_string( write_text, 0, 19, 0 );
 	#endif
 
 	#if d_map_rendering_offsets
@@ -768,94 +780,102 @@ void debugging( void ) {
 		write_string( write_text, 0, 1, 0 );
 	#endif
 
+	#if d_player_position
+		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
+		write_string( write_text, 0, 0, 0 );
+	#endif
+
 	#if d_player_movement
-		/* Draw coloured squares to indicate player's allowed movement */
-		if( exit_tile.travel_n ) {
-			
-			/* Blue tile since this is an exit tile */
-			obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-		} else {
 
-			if( map_pos.y != 0 ) {
-
-				/* Green tile as we are allow to walk in this direction */
-				if(allowed_movement.travel_n) {
-					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-				} else {
-					/* Red tile as we're not allowed to walk in this direction */
-					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-				}
+		if( !scroll_movement ) {
+			/* Draw coloured squares to indicate player's allowed movement */
+			if( exit_tile.travel_n ) {
+				
+				/* Blue tile since this is an exit tile */
+				obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 			} else {
 
-				/* Yellow tile as this is the edge of the map */
-				obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				if( map_pos.y != 0 ) {
+
+					/* Green tile as we are allow to walk in this direction */
+					if(allowed_movement.travel_n) {
+						obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					} else {
+						/* Red tile as we're not allowed to walk in this direction */
+						obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					}
+				} else {
+
+					/* Yellow tile as this is the edge of the map */
+					obj_set_attr( debug_colour_n_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_n_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				}
 			}
-		}
 
-		if( exit_tile.travel_e ) {
+			if( exit_tile.travel_e ) {
 
-			obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-		} else {
-
-			if( map_pos.x != ( _current_map->map_width - 2 ) ) {
-
-				if( allowed_movement.travel_e ) {
-					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-				} else {
-					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-				}
-			} else {
 				obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 				obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-			}
-		}
-
-		if( exit_tile.travel_s ) {
-
-			obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-		} else {
-
-			if( map_pos.y != ( _current_map->map_height - 2 ) ) {
-
-				if( allowed_movement.travel_s ) {
-					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-				} else {
-					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-				}
 			} else {
-				obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
-			}
-		}
 
-		if( exit_tile.travel_w ) {
+				if( map_pos.x != ( _current_map->map_width - 2 ) ) {
 
-			obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-			obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
-		} else {
-
-			if( map_pos.x != 0 ) {
-
-				if( allowed_movement.travel_w ) {
-					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					if( allowed_movement.travel_e ) {
+						obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					} else {
+						obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					}
 				} else {
-					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
-					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_e_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 				}
+			}
+
+			if( exit_tile.travel_s ) {
+
+				obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
 			} else {
-				obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
-				obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+
+				if( map_pos.y != ( _current_map->map_height - 2 ) ) {
+
+					if( allowed_movement.travel_s ) {
+						obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					} else {
+						obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					}
+				} else {
+					obj_set_attr( debug_colour_s_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_s_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				}
+			}
+
+			if( exit_tile.travel_w ) {
+
+				obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+				obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 4 ) | ATTR2_PRIO( 2 ) ) );
+			} else {
+
+				if( map_pos.x != 0 ) {
+
+					if( allowed_movement.travel_w ) {
+						obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 2 ) | ATTR2_PRIO( 2 ) ) );
+					} else {
+						obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+						obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 0 ) | ATTR2_PRIO( 2 ) ) );
+					}
+				} else {
+					obj_set_attr( debug_colour_w_1, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+					obj_set_attr( debug_colour_w_2, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 6 ) | ATTR2_PRIO( 2 ) ) );
+				}
 			}
 		}
 
@@ -888,15 +908,30 @@ void debugging( void ) {
 			write_string( write_text, 0, 0, 0 );
 		}
 	#endif
-	
-	#if d_map_coordinates
-		uint8_t i;
-		for( i = 0; i < 10; i++ ) {
-			write_character( ( 48 + i ), 0, i );
-			write_character( ( 48 + i ), 0, ( i + 10 ) );
-		}
-		sprintf( write_text, "012345678901234567890123456789" );
-		write_string( write_text, 0, 19, 0 );
+
+	#if d_exit_map_info
+		sprintf( write_text, "E(%d,%d,%d)P(%d %d)", exit_map.waiting_load, exit_map.waiting_show, exit_map.exit_map_id, exit_map.exit_map_pos.x, exit_map.exit_map_pos.y );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_animation_info
+		sprintf( write_text,"R(%d,%d)F(%d,%d)S(%d,%d)T(%d,%d,%d)", animation.running, animation.reverse, animation.repeat, animation.finished, animation.step, ( ( 0x7 ^ animation.step ) - 2 ), animation.tick, animation.occurance, ( ( animation.tick % animation.occurance ) ? 0 : 1) );
+		write_string( write_text, 0, 0, 0 );
+	#endif
+
+	#if d_textbox_info
+		sprintf( write_text,"R(%d,%d)C(%d/%d)T(%d,%d)D(%d)", textbox_running, textbox_update, textbox_line, total_textbox_lines, write_text_char_count, write_text_line_count, ticks.interaction_delay );
+		write_string( write_text, 0, 0, 0 );
+	#endif
+
+	#if d_key_info
+		sprintf( write_text, "K(%d,%d,%d,%d,%d,%d)         ", (int)key_down(KEY_UP), (int)key_down(KEY_LEFT), (int)key_down(KEY_DOWN), (int)key_down(KEY_RIGHT), (int)key_down(KEY_A), (int)key_down(KEY_B) );
+		write_string( write_text, 0, 1, 0 );
+	#endif
+
+	#if d_tick_info
+		sprintf( write_text, "D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)ticks.game );
+		write_string( write_text, 0, 2, 0 );
 	#endif
 }
 
@@ -1025,6 +1060,49 @@ void calculate_map_offsets( void ) {
 
 	if( map_pos.x < 14 )
 		_screen_offsets.w = ( 14 - map_pos.x );
+}
+
+void show_exit_arrow( void ) {
+
+	/* Draw an exit arrow if we're stood on an exit tile at the edge of the map */
+	if( ( exit_tile.travel_n ) && ( map_pos.y == 0 ) ) {
+
+		//draw_sprite( (uint16_t*)arrow, 0, false, true, 56, 48, 8 );
+		obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP ), ( ATTR1_SIZE_8 | ATTR1_VFLIP ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_pos( exit_arrow_v, 116, 64 );
+	} else if( ( exit_tile.travel_e ) && ( map_pos.x == ( _current_map->map_width - 2 ) ) ) {
+
+		//draw_sprite( (uint16_t*)arrow, 1, true, false, 64, 56, 8 );
+		obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP ), ( ATTR1_SIZE_8 | ATTR1_HFLIP ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_pos( exit_arrow_h, 128, 76 );
+	} else if( ( exit_tile.travel_s ) && ( map_pos.y == ( _current_map->map_height - 2 ) ) ) {
+
+		//draw_sprite( (uint16_t*)arrow, 0, false, false, 56, 64, 8 );
+		obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_pos( exit_arrow_v, 116, 88 );
+	} else if( ( exit_tile.travel_w ) && ( map_pos.x == 0 ) ) {
+
+		//draw_sprite( (uint16_t*)arrow, 1, false, false, 48, 56, 8 );
+		obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+		obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
+
+		obj_set_pos( exit_arrow_h, 104, 76 );
+	} else {
+
+		hide_exit_arrow();
+	}
+}
+
+void hide_exit_arrow( void ) {
+
+	obj_set_attr( exit_arrow_v, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 104 ) | ATTR2_PRIO( 2 ) ) );
+	obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 }
 
 void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) ) {
