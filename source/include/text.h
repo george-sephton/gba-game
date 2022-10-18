@@ -4,11 +4,12 @@
 #include "project.h"
 #include "keys.h"
 
+extern struct game_ticks ticks;
 extern struct player_struct player;
 
 /* Textbox variables */
 extern bool textbox_running, textbox_update;
-extern uint8_t scroll_arrow_count, scroll_arrow_offset, total_textbox_lines, textbox_line, textbox_button_delay;
+extern uint8_t scroll_arrow_count, scroll_arrow_offset, total_textbox_lines, textbox_line;
 extern uint8_t write_text_line_count, write_text_char_count;
 extern char (*text_ptr)[29], write_text[100];
 

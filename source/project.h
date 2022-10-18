@@ -28,7 +28,7 @@ typedef void (*fnptr)(void);
 #define d_interaction_info                false	// Displays information about interaction tiles
 #define d_exit_map_info                   false	// Displays information about the map to load if exiting current map
 #define d_animation_info                  false	// Displays information about the running animation
-#define d_textbox_info                    false	// Displays information about the current textbox
+#define d_textbox_info                    true	// Displays information about the current textbox
 #define d_npc_info                        false	// Displays information about the NPC
 #define d_key_info                        false	// Displays information about the keys being pressed
 #define d_tick_info                       false	// Displays various timer ticks
@@ -53,7 +53,7 @@ typedef void (*fnptr)(void);
 #define SBB_SIZE			0x00800
 #define VRAM_BG_SIZE		0x10000
 
-#define MEM_PAL_OBJ		(MEM_PAL + PAL_BG_SIZE)
+#define MEM_PAL_OBJ			(MEM_PAL + PAL_BG_SIZE)
 
 /* REG_DISPCNT */
 #define DCNT_MODE0			0x0000	// Mode 0; bg 0-4: reg
@@ -427,6 +427,7 @@ struct game_ticks {
 	uint32_t game;
 	uint8_t animation;
 	uint8_t player;
+	uint8_t interaction_delay;
 };
 
 /*********************************************************************************

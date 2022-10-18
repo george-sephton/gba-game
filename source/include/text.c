@@ -2,7 +2,7 @@
 
 /* Textbox variables */
 bool textbox_running, textbox_update;
-uint8_t scroll_arrow_count, scroll_arrow_offset, total_textbox_lines, textbox_line, textbox_button_delay;
+uint8_t scroll_arrow_count, scroll_arrow_offset, total_textbox_lines, textbox_line;
 uint8_t write_text_line_count, write_text_char_count;
 char (*text_ptr)[29], write_text[100];
 
@@ -111,14 +111,13 @@ void draw_textbox( void ) {
 			if( scroll_arrow_offset > 2 ) scroll_arrow_offset = 0;
 		}
 
-		/* Deal with the button pressed */
-		if( ( key_down( KEY_A ) ) && ( textbox_button_delay == 0 ) ) {
+		/* Advance textbox when either button A or B are pressed */
+		if( ( ( key_down( KEY_A ) ) || ( key_down( KEY_B ) ) ) && ( !textbox_update ) ) {
 
 			if( ( textbox_line + 3 ) < total_textbox_lines ) {
 				
 				/* Move to the next line and type out only the last line */
 				textbox_line++;
-				textbox_button_delay = 10;
 
 				write_text_char_count = 1;
 
@@ -133,14 +132,11 @@ void draw_textbox( void ) {
 				}
 
 				textbox_running = false;
-				textbox_button_delay = 10;
+
+				/* Add delay so the user doesn't immediately restart the interaction */
+				ticks.interaction_delay = 50;
 			}
 		}
-	}
-
-	/* Add delay after button presses */
-	if( textbox_button_delay > 0 ) {
-		textbox_button_delay--;
 	}
 }
 
@@ -154,12 +150,9 @@ void open_textbox( char (*_text_ptr)[29], uint8_t _total_lines ) {
 	scroll_arrow_count = 0;
 	scroll_arrow_offset = 0;
 	textbox_line = 0;
-	textbox_button_delay = 0;
 
 	write_text_line_count = 0;
 	write_text_char_count = 1;
-
-	textbox_button_delay = 10;
 
 	/* Stop the player's movement */
 	player.walk_dir.x = 0;

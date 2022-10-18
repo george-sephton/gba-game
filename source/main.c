@@ -58,6 +58,8 @@ void timr0_callback( void ) {
 	ticks.game++;
 	ticks.animation++;
 	ticks.player++;
+
+	if( ticks.interaction_delay > 0 ) ticks.interaction_delay--;
 }
 
 const fnptr master_isrs[2] = {
@@ -146,13 +148,12 @@ void init( void ) {
 	scroll_arrow_count = 0;
 	scroll_arrow_offset = 0;
 	textbox_line = 0;
-	textbox_button_delay = 0;
 
 	write_text_line_count = 0;
 	write_text_char_count = 1;
 
 	/* Initialise timer and ticks */
-	ticks = (struct game_ticks) { 0, 0, 0 };
+	ticks = (struct game_ticks) { 0, 0, 0, 0 };
 
 	/* Configure BG0 using charblock 1 and screenblock 16 - background */
 	REG_BG0CNT = BG_CBB(1) | BG_SBB(16) | BG_8BPP | BG_REG_32x32 | BG_PRIO(3);
@@ -376,7 +377,7 @@ int main( void ) {
 			  ( ( interaction_tile.travel_e ) && ( player.face_dir.x == 1 ) && ( player.face_dir.y == 0 ) ) ||
 			  ( ( interaction_tile.travel_s ) && ( player.face_dir.x == 0 ) && ( player.face_dir.y == -1 ) ) ||
 			  ( ( interaction_tile.travel_w ) && ( player.face_dir.x == -1 ) && ( player.face_dir.y == 0 ) ) ) &&
-			  ( key_down( KEY_A ) ) && ( textbox_button_delay == 0 ) && ( !textbox_running ) ) {
+			  ( key_down( KEY_A ) ) && ( ticks.interaction_delay == 0 ) && ( !textbox_running ) ) {
 
 			/* User pressed the A Button at an interaction */
 			open_textbox( demo_text1, ( sizeof( demo_text1 ) / 29 ) );
@@ -738,7 +739,7 @@ void debugging( void ) {
 	#endif
 
 	#if d_textbox_info
-		sprintf( write_text,"R(%d,%d)C(%d/%d)T(%d,%d)D(%d)", textbox_running, textbox_update, textbox_line, total_textbox_lines, write_text_char_count, write_text_line_count, textbox_button_delay );
+		sprintf( write_text,"R(%d,%d)C(%d/%d)T(%d,%d)D(%d)", textbox_running, textbox_update, textbox_line, total_textbox_lines, write_text_char_count, write_text_line_count, ticks.interaction_delay );
 		write_string( write_text, 0, 0, 0 );
 	#endif
 
