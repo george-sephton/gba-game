@@ -478,6 +478,7 @@ int main( void ) {
 						/* Ignore tiles outside of the map limits */
 						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
 						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, 18 ); // Top Layer - transparent
 					}
 				}
 
@@ -517,6 +518,7 @@ int main( void ) {
 						/* Ignore tiles outside of the map limits */
 						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
 						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
 					}
 				}
 
@@ -556,6 +558,7 @@ int main( void ) {
 						/* Ignore tiles outside of the map limits */
 						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
 						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, 18 ); // Top Layer - transparent
 					}
 				}
 
@@ -595,6 +598,7 @@ int main( void ) {
 						/* Ignore tiles outside of the map limits */
 						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
 						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
 
 					}
 
