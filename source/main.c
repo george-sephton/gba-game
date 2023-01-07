@@ -18,6 +18,7 @@ struct game_ticks                       ticks;
 int16_t                                 map_bg_texture_offset;
 struct map                             *_current_map;
 struct exit_map_info                    exit_map;
+uint8_t	                                texture_animation_tick;
 
 /* Player */
 struct player_struct                    player;
@@ -47,6 +48,11 @@ OBJ_ATTR                                obj_buffer[ 128 ];
 char demo_text1[][29] = { "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?" };
 //char demo_text1[][29] = { "This is a test of the", "textbox mechanism." };
 
+#define block_background_layer		27
+#define block_foreground_layer		28
+#define block_top_layer				29
+#define block_text_layer			30
+
 /*********************************************************************************
 	Timer IRQ Functions
 *********************************************************************************/
@@ -59,6 +65,8 @@ void timr0_callback( void ) {
 	ticks.game++;
 	ticks.animation++;
 	ticks.player++;
+	ticks.texture_animation_update++;
+	ticks.texture_animation_inc++;
 
 	if( ticks.interaction_delay > 0 ) ticks.interaction_delay--;
 }
@@ -73,6 +81,7 @@ const fnptr master_isrs[2] = {
 *********************************************************************************/
 void init( void ) {
 	
+	uint8_t i;
 	/*********************************************************************************
 		Copy data to VRAM
 	*********************************************************************************/
@@ -83,19 +92,32 @@ void init( void ) {
 
 	/* Load font into VRAM charblock 0 (memory address 0x0600:0000) */
 	memcpy( &tile_mem[0][0], _font_map, sizeof( _font_map ) );
-	/* Load tileset into VRAM charblock 1 (memory address 0x0600:4000) */
-	memcpy( &tile_mem[1][0], _texture_map, sizeof( _texture_map ) );
 	/* Load sprites into VRAM charblock 4 (memory address 0x0601:0000) */
 	memcpy( &tile_mem[4][0], _sprite_map, sizeof( _sprite_map ) );
+	
+
+	//sprintf( write_text, "%d/%d", sizeof( _texture_map ), ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ) );
+	//write_string( write_text, 0, 0, 0 );
+
+	/* Load tileset into VRAM starting at charblock 1 (memory address 0x0600:4000) */
+	for( i = 0; i < ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ); i++ ) {
+
+		//sprintf( write_text, "%d,%d/%d", (i+1), (i*0x4000), ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
+		//write_string( write_text, 0, (i + 1), 0 );
+
+		//memcpy( &tile_mem[(i + 2)][0], &_texture_map[(i*0x4000)], ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
+	}
+	memcpy( &tile_mem[1][0], _texture_map, sizeof( _texture_map ) );
+	
 
 	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
-	toncset16( &se_mem[16][0], 0, 2048 );
+	toncset16( &se_mem[block_background_layer][0], 0, 2048 );
 	/* Clear foreground map at screenblock 17 (memory address 0x0600:8800) */
-	toncset16( &se_mem[17][0], 0, 2048 );
+	toncset16( &se_mem[block_foreground_layer][0], 0, 2048 );
 	/* Clear top layer at screenblock 18 (memory address 0x0600:9000) */
-	toncset16( &se_mem[18][0], 0, 2048 );
+	toncset16( &se_mem[block_top_layer][0], 0, 2048 );
 	/* Clear debug overlay at screenblock 19 (memory address 0x0600:9800) */
-	toncset16( &se_mem[19][0], 0, 2048 );
+	toncset16( &se_mem[block_text_layer][0], 0, 2048 );
 
 	/*********************************************************************************
 		Initialisation
@@ -151,6 +173,7 @@ void init( void ) {
 	player_movement_delay = 0;
 	scroll_movement = false;
 	scroll_counter = 0;
+	texture_animation_tick = 5;
 	move_tile_counter = 0;
 	upcoming_map_pos.x = 0;
 	upcoming_map_pos.y = 0;
@@ -173,23 +196,23 @@ void init( void ) {
 	write_text_char_count = 1;
 
 	/* Initialise timer and ticks */
-	ticks = (struct game_ticks) { 0, 0, 0, 0 };
+	ticks = (struct game_ticks) { 0, 0, 0, 0, 0, 0 };
 
 	/* Configure BG0 using charblock 1 and screenblock 16 - background */
-	REG_BG0CNT = BG_CBB(1) | BG_SBB(16) | BG_8BPP | BG_REG_32x32 | BG_PRIO(3);
+	REG_BG0CNT = BG_CBB(1) | BG_SBB(block_background_layer) | BG_8BPP | BG_REG_32x32 | BG_PRIO(3);
 	/* Configure BG1 using charblock 1 and screenblock 17 - foreground */
-	REG_BG1CNT = BG_CBB(1) | BG_SBB(17) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
+	REG_BG1CNT = BG_CBB(1) | BG_SBB(block_foreground_layer) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
 	/* Configure BG2 using charblock 1 and screenblock 18 - top layer */
-	REG_BG2CNT = BG_CBB(1) | BG_SBB(18) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
+	REG_BG2CNT = BG_CBB(1) | BG_SBB(block_top_layer) | BG_8BPP | BG_REG_32x32 | BG_PRIO(1);
 	/* Configure BG3 using charblock 0 and screenblock 19 - menu/dialog/debug overlay */
-	REG_BG3CNT = BG_CBB(0) | BG_SBB(19) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
+	REG_BG3CNT = BG_CBB(0) | BG_SBB(block_text_layer) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
 	/* Set bitmap mode to 0 and show all backgrounds and show sprites */
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec) { 2, 4 };
-	_current_map = &map_list[1];
+	map_pos = (struct dir_vec) { 12, 46 };
+	_current_map = &map_list[0];
 
 	/* Draw the map */
 	draw_map_init( true );
@@ -206,6 +229,16 @@ void init( void ) {
 
 	/* Initialise animation variables - none in progress */
 	animation.running = false;
+
+	/* Tile set loading debug */
+	sprintf( write_text, "%d/%d", sizeof( _texture_map ), ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ) );
+	write_string( write_text, 0, 0, 0 );
+
+	for( i = 0; i < ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ); i++ ) {
+
+		sprintf( write_text, "%d,%d/%d", (i+1), (i*0x4000), ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
+		write_string( write_text, 0, (i + 1), 0 );
+	}
 }
 
 int main( void ) {
@@ -474,11 +507,11 @@ int main( void ) {
 
 					/* Loop through the 32 columns of the display (x-direction) */
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
-						
+
 						/* Ignore tiles outside of the map limits */
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, 18 ); // Top Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 1, 0, 0, block_background_layer ); // Background Layer - black
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 31 + scroll_pos.y ), 32 ), 0, 0, 0, block_top_layer ); // Top Layer - transparent
 					}
 				}
 
@@ -516,9 +549,9 @@ int main( void ) {
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
-						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, block_background_layer ); // Background Layer - black
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 30 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, block_top_layer ); // Top Layer - transparent
 					}
 				}
 
@@ -556,9 +589,9 @@ int main( void ) {
 					for( _draw_x = 0; _draw_x < 32; _draw_x++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, 17 ); // Foreground Layer - transparent
-						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, 18 ); // Top Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 1, 0, 0, block_background_layer ); // Background Layer - black
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
+						set_tile( g_mod( ( _draw_x + scroll_pos.x ), 32 ), g_mod( ( 20 + scroll_pos.y ), 32 ), 0, 0, 0, block_top_layer ); // Top Layer - transparent
 					}
 				}
 
@@ -596,9 +629,9 @@ int main( void ) {
 					for( _draw_y = 0; _draw_y < 32; _draw_y++ ) {
 						
 						/* Ignore tiles outside of the map limits */
-						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, 16 ); // Background Layer - black
-						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
-						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 1, 0, 0, block_background_layer ); // Background Layer - black
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
+						set_tile( g_mod( ( 31 + scroll_pos.x ), 32 ), _draw_y, 0, 0, 0, block_top_layer ); // Top Layer - transparent
 
 					}
 
@@ -667,6 +700,20 @@ int main( void ) {
 			}
 		}
 
+		/* Background Texture Tick - Increment Offset */
+		if( ticks.texture_animation_inc >= 100 ) {
+
+			ticks.texture_animation_inc = 0;
+			texture_animation_tick++;
+		}
+
+		/* Background Texture Tick - Update */
+		if( ticks.texture_animation_update >= 25 ) {
+
+			ticks.texture_animation_update = 0;
+			update_texture_animations();
+		}
+
 		/* Scroll Tick */
 		if( ticks.player >= 5 ) {
 			
@@ -718,6 +765,9 @@ int main( void ) {
 
 						/* Show any exit arrow if needed */
 						show_exit_arrow();
+
+						/* Update any animating tiles */
+						update_texture_animations();
 
 						/* If the player isn't holding down a button, let's stop moving */
 						if( ( ( player.walk_dir.x == 0 ) && ( player.walk_dir.y == 1 ) && ( !key_down( KEY_UP ) ) ) || 
@@ -786,7 +836,7 @@ void debugging( void ) {
 
 	#if d_player_position
 		sprintf( write_text, "P(%d,%d)S(%d,%d)D(%d,%d)F(%d,%d)    ", map_pos.x, map_pos.y, scroll_pos.x, scroll_pos.y, player.walk_dir.x, player.walk_dir.y, player.face_dir.x, player.face_dir.y );
-		write_string( write_text, 0, 0, 0 );
+		write_string( write_text, 0, 2, 0 );
 	#endif
 
 	#if d_player_movement
@@ -934,14 +984,15 @@ void debugging( void ) {
 	#endif
 
 	#if d_tick_info
-		sprintf( write_text, "D(%d)T(%d)C(%d)", player_movement_delay, player_animation_tick, (int)ticks.game );
+		sprintf( write_text, "D(%d)T(%d)A(%d)C(%d)", player_movement_delay, player_animation_tick, texture_animation_tick, (int)ticks.game );
 		write_string( write_text, 0, 2, 0 );
 	#endif
 }
 
 void calculate_move_restrictions( void ) {
 
-	const struct map_tile (*current_map_tile_ptr) = _current_map->map_tiles_ptr; /* Get a pointer to the current tile */
+	/* Get a pointer to the current tile */
+	const struct map_tile (*current_map_tile_ptr) = _current_map->map_tiles_ptr;
 	current_map_tile_ptr += map_pos.y * _current_map->map_width; /* Move to the correct y value */
 	current_map_tile_ptr += map_pos.x; /* Move to the correct x value */
 
@@ -1046,6 +1097,8 @@ void calculate_move_restrictions( void ) {
 	if( interaction_tile.travel_e ) allowed_movement.travel_e = false;
 	if( interaction_tile.travel_s ) allowed_movement.travel_s = false;
 	if( interaction_tile.travel_w ) allowed_movement.travel_w = false;
+
+	//allowed_movement = ( struct dir_en ) { true, true, true, true }; // For development
 }
 
 void calculate_map_offsets( void ) {
@@ -1109,70 +1162,102 @@ void hide_exit_arrow( void ) {
 	obj_set_attr( exit_arrow_h, ( ATTR0_SQUARE | ATTR0_8BPP | ATTR0_HIDE ), ( ATTR1_SIZE_8 ), ( ATTR2_ID( 106 ) | ATTR2_PRIO( 2 ) ) );
 }
 
-void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) ) {
+uint16_t calculate_texture_offset( bool bg_texture, const struct map_tile ( *map_tiles_ptr ) ) {
 
-	int16_t _texture_offset, i;
+	uint16_t _texture_offset, i, _texture_group_max_offset, _texture_group_offset;
 
-	/* Check if we have a background texture to draw, and if so add it to the background layer */
-	if( _current_map->bg_texture != -1 )
+	_texture_offset = 0;
 
-		set_tile( _draw_x, _draw_y, map_bg_texture_offset, 0, 0, 16 );
+	if( bg_texture ) {
 
-	/* Make sure there's a texture to draw */
-	if( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) {
+		/* Calculate the background texture offset */
+		for( i = 0; i < (*map_tiles_ptr).bg_texture; i++ ) {
+			_texture_offset += _texture_lengths[i];
+		}
+		
+		_texture_offset += (*map_tiles_ptr).bg_texture_offset;
+	} else {
 
-		/* Calculate the texture offset */
-		_texture_offset = 0;
+		/* Calculate the foreground texture offset */
 		for( i = 0; i < (*map_tiles_ptr).texture; i++ ) {
 			_texture_offset += _texture_lengths[i];
 		}
-		_texture_offset += (*map_tiles_ptr).texture_offset;
 
+		/* This is an animated tile, calculate the offset based on the tick */
+		if( (*map_tiles_ptr).animate_en ) {
+
+			/* Calculate the texture offset based on the animation tick, first get the total textures in the group  */
+			_texture_group_max_offset = _texture_lengths[ (*map_tiles_ptr).texture ];
+			
+			/* Let's now calculate the offset based on the tick */
+			_texture_group_offset = ( ( texture_animation_tick + (*map_tiles_ptr).texture_offset ) % _texture_group_max_offset );
+			_texture_offset += _texture_group_offset;
+		} else {
+
+			/* Normal tile, just calculate the offset */
+			_texture_offset += (*map_tiles_ptr).texture_offset;
+		}
+	}
+
+	return _texture_offset;
+}
+
+void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) ) {
+
+	int16_t _texture_offset, _bg_texture_offset, i;
+
+	/* Make sure there's a background texture to draw */
+	if( (*map_tiles_ptr).bg_texture < sizeof( _texture_lengths ) ) {
+
+		/* Calculate the background texture offset */
+		_bg_texture_offset = calculate_texture_offset( true, map_tiles_ptr );
+
+		/* Draw the background */
+		set_tile( _draw_x, _draw_y, _bg_texture_offset, (*map_tiles_ptr).bg_texture_reverse_x, (*map_tiles_ptr).bg_texture_reverse_y, block_background_layer );
+	}
+
+	/* Make sure there's a foreground texture to draw */
+	if( (*map_tiles_ptr).texture < sizeof( _texture_lengths ) ) {
+
+		/* Calculate the foreground texture offset */
+		_texture_offset = calculate_texture_offset( false, map_tiles_ptr );
+
+		/* Draw the foreground */
 		if( (*map_tiles_ptr).top_layer ) {
 
 			/* Top Layer texture, draw to the top layer map and clear foreground layer */
-			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 18 );
-			set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
+			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, block_top_layer );
+			set_tile( _draw_x, _draw_y, 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
 		} else {
 
 			/* Bottom Layer texture, draw to the normal map and clear top layer */
-			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, 17 );
-			set_tile( _draw_x, _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
+			set_tile( _draw_x, _draw_y, _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, block_foreground_layer );
+			set_tile( _draw_x, _draw_y, 0, 0, 0, block_top_layer ); // Top Layer - transparent
 		}
 	} else {
 
 		/* If not, draw a transparent tile to ensure we're not showing old tiles in the buffer */
-		set_tile( _draw_x, _draw_y, 0, 0, 0, 17 ); // Foreground Layer - transparent
-		set_tile( _draw_x, _draw_y, 0, 0, 0, 18 ); // Top Layer - transparent
+		set_tile( _draw_x, _draw_y, 0, 0, 0, block_foreground_layer ); // Foreground Layer - transparent
+		set_tile( _draw_x, _draw_y, 0, 0, 0, block_top_layer ); // Top Layer - transparent
 	}
 }
 
 void draw_map_init( bool reset_scroll ) {
 
 	/* Clears the display display buffer and draws the map */
-	int16_t _draw_x, _draw_y, i;
+	int16_t _draw_x, _draw_y;
 
 	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
-	toncset16( &se_mem[16][0], 1, 2048 );
+	toncset16( &se_mem[block_background_layer][0], 1, 2048 );
 
 	/* Set transparent background for foreground map at screenblock 17 (memory address 0x0600:8800) */
-	toncset16( &se_mem[17][0], 0, 2048 );
+	toncset16( &se_mem[block_foreground_layer][0], 0, 2048 );
 
 	/* Set transparent background for top layer at screenblock 18 (memory address 0x0600:9000) */
-	toncset16( &se_mem[18][0], 0, 2048 );
+	toncset16( &se_mem[block_top_layer][0], 0, 2048 );
 
 	/* Calculate gaps around displayed map */
 	calculate_map_offsets();
-
-	/* Calculate the background texture offset */
-	map_bg_texture_offset = 0;
-	if( _current_map->bg_texture != -1 ) {
-
-		for( i = 0; i < _current_map->bg_texture; i++ ) {
-			map_bg_texture_offset += _texture_lengths[i];
-		}
-		map_bg_texture_offset += _current_map->bg_texture_offset;
-	}
 
 	/* Get the current map tile pointer, starting at (0, 0) */
 	const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
@@ -1236,10 +1321,73 @@ void draw_map_init( bool reset_scroll ) {
 	}
 }
 
+void update_texture_animations( void ) {
+
+	/* Updates any tile texture animations */
+	int16_t _draw_x, _draw_y, i;
+	uint16_t _texture_group_max_offset, _texture_group_offset, _texture_offset;
+
+	/* Calculate gaps around displayed map */
+	calculate_map_offsets();
+
+	/* Get the tile pointer of the start of the display, 0,0 */
+	const struct map_tile (*map_tiles_ptr) = _current_map->map_tiles_ptr;
+
+	/* Move the map pointer to first column to draw, if there's a gap around the edges, we don't need to move anything */
+	if( _screen_offsets.w == 0 )
+		map_tiles_ptr += ( map_pos.x - 14 );
+
+	/* Move the map pointer to first row to draw, if there's a gap around the edges, we don't need to move anything */
+	if( _screen_offsets.n == 0 )
+		map_tiles_ptr += ( ( map_pos.y - 9 ) * _current_map->map_width );
+
+	/* Loop through each of the 20 rows of the display (y-direction) */
+	for( _draw_y = 0; _draw_y < 20; _draw_y++ ) {
+		
+		/* Ignore tiles outside of the map limits */
+		if( ( _draw_y >= _screen_offsets.n ) && ( _draw_y <= ( 19 - _screen_offsets.s ) ) ) {
+			
+			/* Loop through each of the 30 columns (x-direction) */
+			for( _draw_x = 0; _draw_x < 30; _draw_x++ ) {
+
+				/* Again, ignore tiles outside of the map limits */
+				if( ( _draw_x >= _screen_offsets.w ) && ( ( map_pos.x + _draw_x - 13 ) <= _current_map->map_width ) ) {
+
+					/* Only update animated tiles */
+					if( (*map_tiles_ptr).animate_en ) {
+
+						/* Calculate the foreground texture offset */
+						_texture_offset = calculate_texture_offset( false, map_tiles_ptr );
+
+						set_tile( g_mod( ( scroll_pos.x + _draw_x ), 32 ), g_mod( ( scroll_pos.y + _draw_y ), 32 ), _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, block_top_layer );
+					}
+
+					/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
+					if( _draw_x != 29 ) map_tiles_ptr++;
+				}
+			}
+
+			/* Increment the pointer as we move to the next row on the dislay, but if we're drawing the last row, then don't move the pointer either */
+			if( ( _screen_offsets.e == 0 ) || ( _screen_offsets.w == 0 ) ) {
+
+				/* If we're drawing the last row then don't move the pointer either */
+				if( _draw_y != 19 ) 
+					map_tiles_ptr += ( _current_map->map_width - 29 + _screen_offsets.w + ( ( _screen_offsets.e > 1 ) ? ( _screen_offsets.e - 1 ) : 0 ) );
+			}
+		}
+	}
+
+
+	//toncset16( &se_mem[19][0], 0, 2048 ); //17
+	//set_tile( g_mod( scroll_pos.x, 32 ), g_mod( scroll_pos.y, 32 ), texture_animation_tick, 0, 0, 17 );
+	
+	
+}
+
 void set_player_sprite( uint8_t offset, bool flip_h ) {
 
 	/* Update the offset of the player sprite */
-	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( ( 1 + offset ) * 8 ) | ATTR2_PRIO( 1 ) ) );
+	obj_set_attr( player_sprite, ( ATTR0_SQUARE | ATTR0_8BPP), ( ATTR1_SIZE_16 | ( flip_h ? ATTR1_HFLIP : 0 ) ), ( ATTR2_ID( ( 1 + offset ) * 8 ) | ATTR2_PRIO( 2 ) ) );
 	obj_set_pos( player_sprite, 112, 72 );
 }
 

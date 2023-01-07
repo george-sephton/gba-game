@@ -10,12 +10,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef void (*fnptr)(void);
 
 /* Include Tonc sources: https://www.coranac.com/tonc/text/ */
 #include "tonc/tonc_utils.h"
 #include "tonc/tonc_irq.h"
+
+// This always sets the top left corner tile of the display:
+//set_tile( g_mod( scroll_pos.x, 32 ), g_mod( scroll_pos.y, 32 ), 0, 0, 0, 17 );
 
 /*********************************************************************************
 	Debugging Definitions
@@ -386,6 +390,7 @@ struct animation_settings {
 /* Map structures */
 struct map_tile {
 	bool top_layer;
+	bool animate_en;
 	bool can_walk_n;
 	bool can_walk_e;
 	bool can_walk_s;
@@ -394,6 +399,10 @@ struct map_tile {
 	uint16_t texture_offset;
 	bool texture_reverse_x;
 	bool texture_reverse_y;
+	uint16_t bg_texture;
+	uint16_t bg_texture_offset;
+	bool bg_texture_reverse_x;
+	bool bg_texture_reverse_y;
 	bool interact_tile;
 	uint16_t interact_id;
 	bool npc_tile;
@@ -409,9 +418,7 @@ struct map {
 	const struct map_tile (*map_tiles_ptr);
 	uint16_t map_height;
 	uint16_t map_width;
-	bool running_en;
-	int16_t bg_texture;
-	int16_t bg_texture_offset;
+	uint16_t map_setting_id;
 };
 
 struct exit_map_info {
@@ -427,6 +434,8 @@ struct game_ticks {
 	uint8_t animation;
 	uint8_t player;
 	uint8_t interaction_delay;
+	uint8_t texture_animation_update;
+	uint8_t texture_animation_inc;
 };
 
 /*********************************************************************************
@@ -458,6 +467,7 @@ void hide_exit_arrow( void );
 
 void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) );
 void draw_map_init( bool reset_scroll );
+void update_texture_animations( void );
 void set_player_sprite( uint8_t offset, bool flip_h );
 
 void init( void );
