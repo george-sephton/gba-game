@@ -37,29 +37,29 @@ void draw_textbox( void ) {
 				box_offset = 0;
 
 			/* Draw textbox corners */
-			set_tile( 0, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 97, 0, 0, 19 );
-			set_tile( 29, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 97, 1, 0, 19 );
-			set_tile( 0, 19, 99, 0, 0, 19 );
-			set_tile( 29, 19, 99, 1, 0, 19 );
+			set_tile( 0, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 97, 0, 0, block_text_layer );
+			set_tile( 29, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 97, 1, 0, block_text_layer );
+			set_tile( 0, 19, 99, 0, 0, block_text_layer );
+			set_tile( 29, 19, 99, 1, 0, block_text_layer );
 
 			/* Draw textbox horizontal borders and filling */
 			for( i = 1; i < 29; i++ ) {
-				set_tile( i, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 98, 0, 0, 19 );
-				set_tile( i, 19, 100, 0, 0, 19 );
+				set_tile( i, ( ( total_textbox_lines < 3 ) ? 15 : 13 ), 98, 0, 0, block_text_layer );
+				set_tile( i, 19, 100, 0, 0, block_text_layer );
 
 				if( total_textbox_lines >= 3 ) {
-					set_tile( i, 14, 1, 0, 1, 19 );
-					set_tile( i, 15, 1, 0, 1, 19 );
+					set_tile( i, 14, 1, 0, 1, block_text_layer );
+					set_tile( i, 15, 1, 0, 1, block_text_layer );
 				}
-				set_tile( i, 16, 1, 0, 1, 19 );
-				set_tile( i, 17, 1, 0, 1, 19 );
-				set_tile( i, 18, 1, 0, 1, 19 );
+				set_tile( i, 16, 1, 0, 1, block_text_layer );
+				set_tile( i, 17, 1, 0, 1, block_text_layer );
+				set_tile( i, 18, 1, 0, 1, block_text_layer );
 			}
 
 			/* Draw textbox vertical borders */
 			for( i = ( ( total_textbox_lines < 3 ) ? 16 : 14 ); i < 19; i++ ) {
-				set_tile( 0, i, 101, 0, 0, 19 );
-				set_tile( 29, i, 101, 1, 0, 19 );
+				set_tile( 0, i, 101, 0, 0, block_text_layer );
+				set_tile( 29, i, 101, 1, 0, block_text_layer );
 			}
 
 			/* Draw up to 3 lines of text */
@@ -99,7 +99,7 @@ void draw_textbox( void ) {
 
 		/* Draw a scroll arrow if needed */
 		if( ( textbox_line + 3 ) < total_textbox_lines ) {
-			set_tile( 28, 18, ( 102 + scroll_arrow_offset ), 0, 0, 19 );
+			set_tile( 28, 18, ( 102 + scroll_arrow_offset ), 0, 0, block_text_layer );
 		}
 
 		/* Animate the scroll arrow */
@@ -127,7 +127,7 @@ void draw_textbox( void ) {
 				/* Close the textbox */
 				for( i = 0; i < 30; i++ ) {
 					for( j = 13; j < 20; j++ ) {
-						set_tile( i, j, 0, 0, 0, 19 );
+						set_tile( i, j, 0, 0, 0, block_text_layer );
 					}
 				}
 

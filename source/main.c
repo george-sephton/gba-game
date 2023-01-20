@@ -192,7 +192,7 @@ void init( void ) {
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec) { 16, 52 };
+	map_pos = (struct dir_vec) { 18, 28 };
 	_current_map = &map_list[0];
 
 	/* Draw the map */
