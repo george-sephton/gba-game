@@ -37,6 +37,14 @@ typedef void (*fnptr)(void);
 #define d_npc_info                        false	// Displays information about the NPC
 
 /*********************************************************************************
+	Memory Definitions
+*********************************************************************************/
+#define block_background_layer		27
+#define block_foreground_layer		28
+#define block_top_layer				29
+#define block_text_layer			30
+
+/*********************************************************************************
 	Register Definitions
 *********************************************************************************/
 #define MEM_IO				0x04000000
@@ -391,6 +399,7 @@ struct animation_settings {
 struct map_tile {
 	bool top_layer;
 	bool animate_en;
+	bool bg_animate_en;
 	bool can_walk_n;
 	bool can_walk_e;
 	bool can_walk_s;

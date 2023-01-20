@@ -8,7 +8,7 @@ char (*text_ptr)[29], write_text[100];
 
 void write_character( char character, uint16_t x, uint16_t y ) {
 
-	se_mem[19][ x + ( y * 32 ) ] = ( character - 31 );
+	se_mem[block_text_layer][ x + ( y * 32 ) ] = ( character - 31 );
 }
 
 void write_string( char *char_array, int32_t x, int32_t y, uint16_t char_offset ) {

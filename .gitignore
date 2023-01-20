@@ -41,5 +41,6 @@
 
 build*/
 **/build
+source/data.h
 
 .DS_Store

@@ -6,7 +6,7 @@
 #include "include/text.h"
 
 #include "assets/font.h"
-#include "assets/demo_project.h"
+#include "data.h"
 
 /*********************************************************************************
 	Global Variables
@@ -48,11 +48,6 @@ OBJ_ATTR                                obj_buffer[ 128 ];
 char demo_text1[][29] = { "This is a test of the", "textbox mechanism. Does it", "work alright? Or could we", "improve it?" };
 //char demo_text1[][29] = { "This is a test of the", "textbox mechanism." };
 
-#define block_background_layer		27
-#define block_foreground_layer		28
-#define block_top_layer				29
-#define block_text_layer			30
-
 /*********************************************************************************
 	Timer IRQ Functions
 *********************************************************************************/
@@ -81,7 +76,6 @@ const fnptr master_isrs[2] = {
 *********************************************************************************/
 void init( void ) {
 	
-	uint8_t i;
 	/*********************************************************************************
 		Copy data to VRAM
 	*********************************************************************************/
@@ -94,21 +88,8 @@ void init( void ) {
 	memcpy( &tile_mem[0][0], _font_map, sizeof( _font_map ) );
 	/* Load sprites into VRAM charblock 4 (memory address 0x0601:0000) */
 	memcpy( &tile_mem[4][0], _sprite_map, sizeof( _sprite_map ) );
-	
-
-	//sprintf( write_text, "%d/%d", sizeof( _texture_map ), ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ) );
-	//write_string( write_text, 0, 0, 0 );
-
 	/* Load tileset into VRAM starting at charblock 1 (memory address 0x0600:4000) */
-	for( i = 0; i < ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ); i++ ) {
-
-		//sprintf( write_text, "%d,%d/%d", (i+1), (i*0x4000), ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
-		//write_string( write_text, 0, (i + 1), 0 );
-
-		//memcpy( &tile_mem[(i + 2)][0], &_texture_map[(i*0x4000)], ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
-	}
 	memcpy( &tile_mem[1][0], _texture_map, sizeof( _texture_map ) );
-	
 
 	/* Clear background map at screenblock 16 (memory address 0x0600:8000) */
 	toncset16( &se_mem[block_background_layer][0], 0, 2048 );
@@ -211,7 +192,7 @@ void init( void ) {
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_BG3 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	/* Load the map and set our initial location */
-	map_pos = (struct dir_vec) { 12, 46 };
+	map_pos = (struct dir_vec) { 16, 52 };
 	_current_map = &map_list[0];
 
 	/* Draw the map */
@@ -229,16 +210,6 @@ void init( void ) {
 
 	/* Initialise animation variables - none in progress */
 	animation.running = false;
-
-	/* Tile set loading debug */
-	sprintf( write_text, "%d/%d", sizeof( _texture_map ), ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ) );
-	write_string( write_text, 0, 0, 0 );
-
-	for( i = 0; i < ( ( sizeof( _texture_map ) / 0x4000 ) + 1 ); i++ ) {
-
-		sprintf( write_text, "%d,%d/%d", (i+1), (i*0x4000), ( ( i == ( sizeof( _texture_map ) / 0x4000 ) ) ? ( sizeof( _texture_map ) % 0x4000 ) : 0x4000 ) );
-		write_string( write_text, 0, (i + 1), 0 );
-	}
 }
 
 int main( void ) {
@@ -1174,8 +1145,21 @@ uint16_t calculate_texture_offset( bool bg_texture, const struct map_tile ( *map
 		for( i = 0; i < (*map_tiles_ptr).bg_texture; i++ ) {
 			_texture_offset += _texture_lengths[i];
 		}
-		
-		_texture_offset += (*map_tiles_ptr).bg_texture_offset;
+
+		/* This is an animated tile, calculate the offset based on the tick */
+		if( (*map_tiles_ptr).bg_animate_en ) {
+
+			/* Calculate the texture offset based on the animation tick, first get the total textures in the group  */
+			_texture_group_max_offset = _texture_lengths[ (*map_tiles_ptr).bg_texture ];
+			
+			/* Let's now calculate the offset based on the tick */
+			_texture_group_offset = ( ( texture_animation_tick + (*map_tiles_ptr).bg_texture_offset ) % _texture_group_max_offset );
+			_texture_offset += _texture_group_offset;
+		} else {
+
+			/* Normal tile, just calculate the offset */
+			_texture_offset += (*map_tiles_ptr).bg_texture_offset;
+		}
 	} else {
 
 		/* Calculate the foreground texture offset */
@@ -1204,7 +1188,7 @@ uint16_t calculate_texture_offset( bool bg_texture, const struct map_tile ( *map
 
 void draw_map_tile( int16_t _draw_x, int16_t _draw_y, const struct map_tile ( *map_tiles_ptr ) ) {
 
-	int16_t _texture_offset, _bg_texture_offset, i;
+	int16_t _texture_offset, _bg_texture_offset;
 
 	/* Make sure there's a background texture to draw */
 	if( (*map_tiles_ptr).bg_texture < sizeof( _texture_lengths ) ) {
@@ -1324,8 +1308,8 @@ void draw_map_init( bool reset_scroll ) {
 void update_texture_animations( void ) {
 
 	/* Updates any tile texture animations */
-	int16_t _draw_x, _draw_y, i;
-	uint16_t _texture_group_max_offset, _texture_group_offset, _texture_offset;
+	int16_t _draw_x, _draw_y;
+	uint16_t _texture_offset;
 
 	/* Calculate gaps around displayed map */
 	calculate_map_offsets();
@@ -1359,7 +1343,16 @@ void update_texture_animations( void ) {
 						/* Calculate the foreground texture offset */
 						_texture_offset = calculate_texture_offset( false, map_tiles_ptr );
 
-						set_tile( g_mod( ( scroll_pos.x + _draw_x ), 32 ), g_mod( ( scroll_pos.y + _draw_y ), 32 ), _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, block_top_layer );
+						set_tile( g_mod( ( scroll_pos.x + _draw_x ), 32 ), g_mod( ( scroll_pos.y + _draw_y ), 32 ), _texture_offset, (*map_tiles_ptr).texture_reverse_x, (*map_tiles_ptr).texture_reverse_y, block_foreground_layer );
+					}
+
+					/* Only update animated tiles */
+					if( (*map_tiles_ptr).bg_animate_en ) {
+
+						/* Calculate the foreground texture offset */
+						_texture_offset = calculate_texture_offset( true, map_tiles_ptr );
+
+						set_tile( g_mod( ( scroll_pos.x + _draw_x ), 32 ), g_mod( ( scroll_pos.y + _draw_y ), 32 ), _texture_offset, (*map_tiles_ptr).bg_texture_reverse_x, (*map_tiles_ptr).bg_texture_reverse_y, block_background_layer );
 					}
 
 					/* If we've drawn a tile, increment the pointer (unless we're at the last column of the display, don't want to accidentally cause a hard fault) */
